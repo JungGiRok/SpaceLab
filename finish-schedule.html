@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>마감재 스펙북 생성기 · FINISH SCHEDULE</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#F7F8F6;        /* drafting paper, cool warm */
+    --surface:#FFFFFF;
+    --ink:#1B1E22;          /* graphite ink */
+    --ink-soft:#5B6168;
+    --line:#D9DCD6;         /* hairline rule */
+    --line-strong:#B9BDB5;
+    --blue:#22417A;         /* drawing blueprint indigo */
+    --blue-soft:#E9EEF6;
+    --accent:#C2703D;       /* sample-swatch terracotta, used sparingly */
+    --ok:#2E7D5B;
+    --warn:#B5852B;
+    --bad:#B05545;
+    /* category swatches */
+    --c-floor:#8A6A4F;
+    --c-wall:#5E7A8A;
+    --c-ceil:#9090A6;
+    --c-mold:#6F8466;
+    --c-furn:#A66A4C;
+    --c-door:#7A6A8A;
+    --c-light:#B59330;
+    --c-metal:#6B7076;
+    --c-etc:#8A8A8A;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Pretendard',-apple-system,system-ui,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:0 24px 80px}
+
+  /* ---------- title block header ---------- */
+  header.titleblock{
+    border-bottom:2px solid var(--ink);
+    margin-top:28px;
+    display:grid;
+    grid-template-columns:1fr auto;
+    align-items:end;
+    padding-bottom:14px;
+  }
+  .tb-left h1{
+    font-size:13px;font-weight:800;letter-spacing:.34em;
+    margin:0;color:var(--blue);text-transform:uppercase;
+  }
+  .tb-left .ko{
+    font-size:26px;font-weight:800;letter-spacing:-.02em;margin:4px 0 0;
+  }
+  .tb-left .desc{font-size:13px;color:var(--ink-soft);margin-top:6px;max-width:560px}
+  .tb-right{
+    text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);
+    line-height:1.7;
+  }
+  .tb-right b{color:var(--ink);font-weight:600}
+
+  /* ---------- section frame ---------- */
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--line);
+    margin-top:22px;
+  }
+  .panel-head{
+    display:flex;align-items:center;gap:10px;
+    padding:11px 16px;border-bottom:1px solid var(--line);
+    background:linear-gradient(0deg,#fcfdfb,#fff);
+  }
+  .panel-head .num{
+    font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;
+    background:var(--ink);padding:2px 7px;border-radius:2px;letter-spacing:.05em;
+  }
+  .panel-head h2{font-size:14px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .panel-head .hint{font-size:12px;color:var(--ink-soft);margin-left:auto}
+  .panel-body{padding:16px}
+
+  /* ---------- config row ---------- */
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11.5px;font-weight:600;color:var(--ink-soft);letter-spacing:.02em}
+  input[type=text],input[type=password],select,textarea{
+    font-family:inherit;font-size:13px;color:var(--ink);
+    border:1px solid var(--line-strong);background:#fff;
+    padding:8px 10px;border-radius:3px;width:100%;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--blue-soft);border-color:var(--blue)}
+  .grid{display:grid;gap:14px}
+  .key-row{grid-template-columns:1fr 150px 110px;align-items:end}
+  .meta-grid{grid-template-columns:repeat(3,1fr)}
+  .keywrap{position:relative}
+  .keywrap .toggle{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    background:none;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;
+  }
+
+  button.btn{
+    font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
+    border:1px solid var(--ink);background:var(--ink);color:#fff;
+    padding:9px 16px;border-radius:3px;transition:.12s;
+  }
+  button.btn:hover{background:#000}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+  button.btn.ghost{background:#fff;color:var(--ink)}
+  button.btn.ghost:hover{background:#f3f4f1}
+  button.btn.blue{background:var(--blue);border-color:var(--blue)}
+  button.btn.blue:hover{background:#1a3360}
+  .saved-tag{font-size:11px;color:var(--ok);font-weight:600}
+
+  /* ---------- dropzone ---------- */
+  .dropzone{
+    border:1.5px dashed var(--line-strong);border-radius:4px;
+    padding:30px;text-align:center;color:var(--ink-soft);cursor:pointer;
+    transition:.12s;background:#fcfdfb;
+  }
+  .dropzone:hover,.dropzone.drag{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+  .dropzone .big{font-size:14px;font-weight:600;color:var(--ink)}
+  .dropzone small{display:block;margin-top:5px;font-size:12px}
+
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:14px}
+  .thumb{border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#fff}
+  .thumb .img{aspect-ratio:4/3;background:#eee center/cover no-repeat;position:relative}
+  .thumb .rm{
+    position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;
+    border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;
+  }
+  .thumb .rm:hover{background:#000}
+  .thumb input.note{border:none;border-top:1px solid var(--line);border-radius:0;font-size:12px;padding:7px 9px}
+
+  /* ---------- status ---------- */
+  .status{margin-top:14px;font-size:13px;display:none;align-items:center;gap:9px}
+  .status.show{display:flex}
+  .spinner{width:15px;height:15px;border:2px solid var(--line-strong);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .status.err{color:var(--bad)}
+  .status.ok{color:var(--ok)}
+
+  /* ---------- result table ---------- */
+  #resultPanel{display:none}
+  .table-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .table-tools .sp{flex:1}
+  .filter-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{
+    font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:99px;cursor:pointer;
+    border:1px solid var(--line-strong);background:#fff;color:var(--ink-soft);user-select:none;
+  }
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .sheet-scroll{overflow-x:auto;border:1px solid var(--line)}
+  table.sheet{border-collapse:collapse;width:100%;min-width:1020px;font-size:12.5px}
+  table.sheet th{
+    background:#f1f2ee;font-weight:700;font-size:11px;letter-spacing:.02em;color:var(--ink-soft);
+    text-align:left;padding:9px 8px;border-bottom:1px solid var(--line-strong);white-space:nowrap;
+    position:sticky;top:0;
+  }
+  table.sheet td{border-bottom:1px solid var(--line);padding:0;vertical-align:middle}
+  table.sheet tr:hover td{background:#fafbf8}
+  table.sheet td input,table.sheet td textarea,table.sheet td select{
+    border:none;border-radius:0;background:transparent;padding:7px 8px;font-size:12.5px;width:100%;
+    resize:none;font-family:inherit;
+  }
+  table.sheet td input:focus,table.sheet td textarea:focus,table.sheet td select:focus{
+    outline:none;background:var(--blue-soft);box-shadow:inset 0 0 0 1px var(--blue);
+  }
+  td.cat-cell{position:relative;padding-left:8px}
+  .swatch{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+  td.conf select{font-family:var(--mono);font-size:11px}
+  .conf-상{color:var(--ok)} .conf-중{color:var(--warn)} .conf-하{color:var(--bad)}
+  td.act{text-align:center;width:34px}
+  td.act button{border:none;background:none;color:var(--ink-soft);cursor:pointer;font-size:14px;padding:6px}
+  td.act button:hover{color:var(--bad)}
+  .col-no{width:34px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+
+  .export-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center}
+  .export-row .note{font-size:12px;color:var(--ink-soft);margin-left:auto}
+
+  .disclaimer{font-size:11.5px;color:var(--ink-soft);background:#fbf7f0;border:1px solid #ecdfca;
+    border-left:3px solid var(--accent);padding:10px 13px;border-radius:3px;margin-top:14px;line-height:1.6}
+
+  footer{margin-top:40px;text-align:center;font-size:11px;color:var(--ink-soft);font-family:var(--mono);letter-spacing:.05em}
+
+  @media(max-width:780px){
+    .key-row,.meta-grid{grid-template-columns:1fr}
+    .tb-right{display:none}
+  }
+
+  /* ---------- print = spec book ---------- */
+  @media print{
+    @page{size:A4 landscape;margin:14mm}
+    body{background:#fff}
+    .no-print{display:none!important}
+    .wrap{max-width:none;padding:0}
+    #resultPanel{display:block!important;border:none}
+    .panel{border:none;margin:0}
+    .panel-body{padding:0}
+    .sheet-scroll{overflow:visible;border:1px solid #000}
+    table.sheet{min-width:0;font-size:10px}
+    table.sheet th{background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;position:static}
+    table.sheet td input,table.sheet td textarea,table.sheet td select{font-size:10px}
+    td.act{display:none}
+    .print-title{display:block!important}
+    .swatch{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+  .print-title{display:none}
+  .print-title h3{font-size:15px;margin:0 0 2px;letter-spacing:.2em}
+  .print-title .pt-meta{font-size:10px;font-family:var(--mono);color:#333;display:flex;gap:18px;border-bottom:1.5px solid #000;padding-bottom:6px;margin-bottom:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="titleblock">
+    <div class="tb-left">
+      <h1>Finish Schedule Generator</h1>
+      <div class="ko">마감재 스펙북 생성기</div>
+      <div class="desc">투시도·준공사진을 올리면 Claude Vision이 바닥·벽·천정·제작가구 마감을 식별해 발주처 제출용 마감재 리스트를 만듭니다. 표는 직접 수정하고 Excel·CSV로 내보낼 수 있습니다.</div>
+    </div>
+    <div class="tb-right">
+      DOC. &nbsp;<b>FINISH-SCHED</b><br>
+      REV. &nbsp;&nbsp;<b>1.0</b><br>
+      ENGINE &nbsp;<b>Claude Vision</b><br>
+      MODE &nbsp;&nbsp;<b>shared · access code</b>
+    </div>
+  </header>
+
+  <!-- 1. config -->
+  <section class="panel no-print">
+    <div class="panel-head"><span class="num">01</span><h2>설정</h2>
+      <span class="hint">접속 코드는 이 브라우저에 저장되어 다른 도구와 공유됩니다</span></div>
+    <div class="panel-body">
+      <div class="grid key-row">
+        <div class="field">
+          <label for="apiKey">사내 접속 코드</label>
+          <div class="keywrap">
+            <input type="password" id="apiKey" placeholder="관리자에게 받은 접속 코드">
+            <button class="toggle" id="keyToggle" type="button">표시</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="model">분석 모델</label>
+          <select id="model">
+            <option value="claude-sonnet-4-6">Sonnet 4.6 (균형·권장)</option>
+            <option value="claude-opus-4-8">Opus 4.8 (정밀)</option>
+          </select>
+        </div>
+        <div class="field">
+          <button class="btn ghost" id="saveKey" type="button">저장</button>
+          <span class="saved-tag" id="savedTag" style="display:none">저장됨 ✓</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. project meta -->
+  <section class="panel no-print">
+    <div class="panel-head"><span class="num">02</span><h2>프로젝트 정보</h2>
+      <span class="hint">스펙북 타이틀블록에 들어갑니다</span></div>
+    <div class="panel-body">
+      <div class="grid meta-grid">
+        <div class="field"><label>프로젝트명</label><input type="text" id="m_project" placeholder="예) Shake Shack 강남점"></div>
+        <div class="field"><label>발주처 / 클라이언트</label><input type="text" id="m_client" placeholder="예) (주)SPC"></div>
+        <div class="field"><label>공간 / 구역</label><input type="text" id="m_space" placeholder="예) 1F 다이닝 홀"></div>
+        <div class="field"><label>작성일</label><input type="text" id="m_date"></div>
+        <div class="field"><label>작성자</label><input type="text" id="m_author" placeholder="예) Roro"></div>
+        <div class="field"><label>비고</label><input type="text" id="m_remark" placeholder="예) 1차 디자인 기준"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. images -->
+  <section class="panel no-print">
+    <div class="panel-head"><span class="num">03</span><h2>이미지 업로드</h2>
+      <span class="hint">투시도·렌더링·준공사진 (여러 장 가능)</span></div>
+    <div class="panel-body">
+      <div class="dropzone" id="drop">
+        <div class="big">이미지를 끌어다 놓거나 클릭해서 선택</div>
+        <small>붙여넣기(Ctrl/⌘+V)도 됩니다 · JPG, PNG, WEBP</small>
+        <input type="file" id="fileInput" accept="image/*" multiple hidden>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn blue" id="analyze" type="button" disabled>마감재 분석하기</button>
+        <button class="btn ghost" id="clearImgs" type="button" style="display:none">이미지 비우기</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </section>
+
+  <!-- 4. result -->
+  <section class="panel" id="resultPanel">
+    <div class="panel-head no-print"><span class="num">04</span><h2>마감재 리스트</h2>
+      <span class="hint">셀을 직접 수정할 수 있습니다</span></div>
+
+    <!-- print-only spec book title -->
+    <div class="print-title" id="printTitle"></div>
+
+    <div class="panel-body">
+      <div class="table-tools no-print">
+        <div class="filter-chips" id="filterChips"></div>
+        <span class="sp"></span>
+        <button class="btn ghost" id="addRow" type="button">+ 행 추가</button>
+      </div>
+
+      <div class="sheet-scroll">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th class="col-no">No.</th>
+              <th>구분</th>
+              <th>적용 위치/부위</th>
+              <th>마감재 종류</th>
+              <th>규격 / 사이즈</th>
+              <th>색상 / 톤</th>
+              <th>마감</th>
+              <th>제조사(추정)</th>
+              <th>모델 / 품번</th>
+              <th>신뢰도</th>
+              <th>비고</th>
+              <th class="act no-print"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="disclaimer no-print">
+        ⚠ 이미지 기반 추정입니다. <b>제조사·품번·정확한 규격</b>은 실제 시방·발주 정보로 반드시 검수·보완하세요.
+        모델은 사진만으로 단정할 수 없는 항목은 비워두도록 했습니다.
+      </div>
+
+      <div class="export-row no-print">
+        <button class="btn" id="expXlsx" type="button">Excel(.xlsx) 내보내기</button>
+        <button class="btn ghost" id="expCsv" type="button">CSV 내보내기</button>
+        <button class="btn ghost" id="printBtn" type="button">인쇄 / PDF</button>
+        <span class="note" id="rowCount"></span>
+      </div>
+    </div>
+  </section>
+
+  <footer>효율미쳤조의 보물창고 · FINISH SCHEDULE GENERATOR</footer>
+</div>
+
+<script src="config.js"></script>
+<script>
+/* ===== 사내 설정: config.js 에서 읽어옵니다 ===== */
+const PROXY_URL = (window.SPACE_TOOLS && window.SPACE_TOOLS.PROXY_URL) || "";
+const CODE_KEY  = (window.SPACE_TOOLS && window.SPACE_TOOLS.STORAGE_KEY) || "space_tools_access_code";
+const PROXY_READY = PROXY_URL && !PROXY_URL.includes("YOUR-");
+
+/* ============ category config ============ */
+const CATS = [
+  {key:'바닥',         color:'var(--c-floor)'},
+  {key:'벽',           color:'var(--c-wall)'},
+  {key:'천정',         color:'var(--c-ceil)'},
+  {key:'걸레받이·몰딩', color:'var(--c-mold)'},
+  {key:'제작가구',     color:'var(--c-furn)'},
+  {key:'도어·창호',    color:'var(--c-door)'},
+  {key:'조명',         color:'var(--c-light)'},
+  {key:'금속·하드웨어', color:'var(--c-metal)'},
+  {key:'기타',         color:'var(--c-etc)'},
+];
+const catColor = k => (CATS.find(c=>c.key===k)||{}).color || 'var(--c-etc)';
+const CONFS = ['상','중','하'];
+
+/* ============ state ============ */
+let images = [];   // {id, dataUrl, base64, mediaType, note}
+let items = [];    // material rows
+let activeFilter = 'ALL';
+let uid = 0;
+
+/* ============ els ============ */
+const $ = id => document.getElementById(id);
+const apiKeyEl=$('apiKey'), modelEl=$('model');
+
+/* ---- date default ---- */
+$('m_date').value = new Date().toISOString().slice(0,10);
+
+/* ============ key persistence ============ */
+(function(){
+  const k = localStorage.getItem(CODE_KEY);
+  const m = localStorage.getItem('finish_model');
+  if(k){ apiKeyEl.value=k; }
+  if(m){ modelEl.value=m; }
+})();
+$('saveKey').onclick = ()=>{
+  localStorage.setItem(CODE_KEY, apiKeyEl.value.trim());
+  localStorage.setItem('finish_model', modelEl.value);
+  const t=$('savedTag'); t.style.display='inline'; setTimeout(()=>t.style.display='none',1800);
+};
+$('keyToggle').onclick = ()=>{
+  const on = apiKeyEl.type==='password';
+  apiKeyEl.type = on?'text':'password';
+  $('keyToggle').textContent = on?'숨김':'표시';
+};
+modelEl.onchange = ()=> localStorage.setItem('finish_model', modelEl.value);
+apiKeyEl.addEventListener('input', ()=> localStorage.setItem(CODE_KEY, apiKeyEl.value.trim()));
+
+/* ============ image handling ============ */
+const drop=$('drop'), fileInput=$('fileInput');
+drop.onclick = ()=> fileInput.click();
+fileInput.onchange = e => addFiles(e.target.files);
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
+drop.addEventListener('drop', e=> addFiles(e.dataTransfer.files));
+window.addEventListener('paste', e=>{
+  const f=[...(e.clipboardData?.files||[])].filter(x=>x.type.startsWith('image/'));
+  if(f.length) addFiles(f);
+});
+
+const MAX_EDGE = 1568;   // Anthropic 권장 최대 유효 해상도(긴 변)
+const JPEG_Q   = 0.85;
+
+function addFiles(list){
+  const files=[...list].filter(f=> f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name));
+  files.forEach(normalizeImage);
+  fileInput.value='';
+}
+// 캔버스로 축소 + JPEG 재인코딩 → 용량/형식(HEIC, 투명PNG 등) 문제 제거
+function normalizeImage(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.naturalWidth, h=img.naturalHeight;
+      const scale=Math.min(1, MAX_EDGE/Math.max(w,h));
+      w=Math.max(1,Math.round(w*scale)); h=Math.max(1,Math.round(h*scale));
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      const ctx=cv.getContext('2d');
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);   // 투명도 → 흰 배경으로 평탄화
+      ctx.drawImage(img,0,0,w,h);
+      const dataUrl=cv.toDataURL('image/jpeg', JPEG_Q);
+      images.push({id:++uid, dataUrl, base64:dataUrl.split(',')[1], mediaType:'image/jpeg', note:''});
+      renderThumbs();
+    };
+    img.onerror=()=> setStatus(`'${file.name}' 은(는) 브라우저에서 열 수 없는 형식입니다(HEIC 등). JPG/PNG로 변환해 올려주세요.`,'err');
+    img.src=reader.result;
+  };
+  reader.onerror=()=> setStatus(`'${file.name}' 읽기에 실패했습니다.`,'err');
+  reader.readAsDataURL(file);
+}
+function renderThumbs(){
+  const box=$('thumbs'); box.innerHTML='';
+  images.forEach(img=>{
+    const d=document.createElement('div'); d.className='thumb';
+    d.innerHTML=`
+      <div class="img" style="background-image:url('${img.dataUrl}')">
+        <button class="rm" title="삭제">×</button>
+      </div>
+      <input class="note" placeholder="공간 메모 (예: 메인 홀)" value="${img.note.replace(/"/g,'&quot;')}">`;
+    d.querySelector('.rm').onclick=()=>{ images=images.filter(x=>x.id!==img.id); renderThumbs(); };
+    d.querySelector('.note').oninput=e=> img.note=e.target.value;
+    box.appendChild(d);
+  });
+  $('analyze').disabled = images.length===0;
+  $('clearImgs').style.display = images.length? 'inline-block':'none';
+}
+$('clearImgs').onclick=()=>{ images=[]; renderThumbs(); };
+
+/* ============ status ============ */
+function setStatus(msg, type){
+  const s=$('status'); s.className='status show'+(type?' '+type:'');
+  s.innerHTML = (type==null? '<span class="spinner"></span>':'') + `<span>${msg}</span>`;
+}
+function hideStatus(){ $('status').className='status'; }
+
+/* ============ robust JSON parse ============ */
+function extractJSON(text){
+  if(!text) throw new Error('빈 응답');
+  let t = text.trim();
+  // strip code fences
+  t = t.replace(/```json\s*/gi,'').replace(/```/g,'').trim();
+  // direct
+  try { return JSON.parse(t); } catch(e){}
+  // slice from first { to last }
+  const a=t.indexOf('{'), b=t.lastIndexOf('}');
+  if(a!==-1 && b!==-1 && b>a){
+    let slice=t.slice(a,b+1);
+    try { return JSON.parse(slice); } catch(e){}
+    // recovery: remove trailing commas, smart quotes
+    let fixed = slice
+      .replace(/[\u201C\u201D]/g,'"').replace(/[\u2018\u2019]/g,"'")
+      .replace(/,\s*([}\]])/g,'$1');
+    try { return JSON.parse(fixed); } catch(e){}
+    // recovery: cut to last complete object in items array
+    const m = fixed.match(/"items"\s*:\s*\[([\s\S]*)/);
+    if(m){
+      const objs=[]; let depth=0,start=-1;
+      const body=m[1];
+      for(let i=0;i<body.length;i++){
+        const ch=body[i];
+        if(ch==='{'){ if(depth===0)start=i; depth++; }
+        else if(ch==='}'){ depth--; if(depth===0&&start!==-1){ objs.push(body.slice(start,i+1)); start=-1; } }
+      }
+      const parsed=[];
+      objs.forEach(o=>{ try{ parsed.push(JSON.parse(o.replace(/,\s*$/,''))); }catch(_){}});
+      if(parsed.length) return {items:parsed};
+    }
+  }
+  throw new Error('JSON 파싱 실패');
+}
+
+/* ============ analyze ============ */
+const SYS_PROMPT = `당신은 인테리어 시공 마감재 적산 전문가입니다. 제공된 투시도(렌더링) 또는 준공사진을 분석해 발주처 제출용 마감재 스펙북(Finish Schedule)을 작성합니다.
+
+식별 대상 표면/요소:
+바닥, 벽, 천정, 걸레받이·몰딩, 고정 제작가구(붙박이장, 리셉션/카운터 데스크, 조리대, 진열장 등), 도어·창호, 고정 조명, 금속·하드웨어 마감.
+
+원칙:
+1. 사진/렌더링만으로는 정확한 제조사·품번을 알 수 없습니다. 확실하지 않으면 brand, model은 빈 문자열("")로 두세요. 절대 가짜 품번을 지어내지 마세요. 추정 근거는 notes에 적으세요.
+2. 동일 마감재가 여러 공간에 반복되면 한 줄로 통합하고 location에 적용 범위를 표기하세요.
+3. material(마감재 종류)은 업계 표준 용어 사용. 예: 포세린 타일, 강마루, 원목마루, 에폭시, 노출콘크리트, 친환경 도장, 무늬목 위 우레탄 도장, 천연석(대리석/화강석), 인조대리석/엔지니어드스톤, 패브릭, 메탈 라미네이트(HPL), 타공 흡음 천정재, 석고보드 위 도장 등.
+4. category는 다음 중 하나만: "바닥","벽","천정","걸레받이·몰딩","제작가구","도어·창호","조명","금속·하드웨어","기타".
+5. confidence: 시각적으로 명확하면 "상", 합리적 추정이면 "중", 불확실하면 "하".
+
+반드시 아래 JSON만 출력하세요. 그 외 인사말·설명·마크다운 금지.
+{
+  "items": [
+    {"category":"","location":"","material":"","spec":"","color":"","finish":"","brand":"","model":"","confidence":"상|중|하","notes":""}
+  ]
+}`;
+
+$('analyze').onclick = async ()=>{
+  const key=apiKeyEl.value.trim();
+  if(!PROXY_READY){ setStatus('서버 주소(config.js)가 아직 설정되지 않았습니다. 관리자에게 문의하세요.','err'); return; }
+  if(!key){ setStatus('접속 코드를 먼저 입력하세요.','err'); return; }
+  if(!images.length){ setStatus('이미지를 먼저 올려주세요.','err'); return; }
+
+  $('analyze').disabled=true;
+  setStatus(`이미지 ${images.length}장 분석 중… (10~40초)`);
+
+  // build content blocks
+  const content=[];
+  images.forEach((img,i)=>{
+    content.push({type:'text', text:`[이미지 ${i+1}${img.note? ' · '+img.note:''}]`});
+    content.push({type:'image', source:{type:'base64', media_type:img.mediaType, data:img.base64}});
+  });
+  const ctx = [];
+  if($('m_project').value) ctx.push('프로젝트: '+$('m_project').value);
+  if($('m_space').value)   ctx.push('공간: '+$('m_space').value);
+  content.push({type:'text', text:
+    `${ctx.length? ctx.join(' / ')+'\n':''}위 이미지를 분석해 마감재 리스트를 지정한 JSON 형식으로만 작성하세요.`});
+
+  const body = JSON.stringify({
+    model: modelEl.value,
+    max_tokens: 8000,
+    system: SYS_PROMPT,
+    messages:[{role:'user', content}]
+  });
+
+  try{
+    const data = await callWithRetry(key, body);
+    const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    const parsed = extractJSON(text);
+    const arr = Array.isArray(parsed) ? parsed : (parsed.items||[]);
+    if(!arr.length) throw new Error('식별된 마감재가 없습니다. 이미지를 바꿔 다시 시도하세요.');
+
+    items = arr.map(normalizeItem);
+    sortItems();
+    renderTable();
+    buildFilters();
+    $('resultPanel').style.display='block';
+    setStatus(`완료 — 마감재 ${items.length}건 식별`, 'ok');
+    setTimeout(hideStatus, 2500);
+    $('resultPanel').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){
+    setStatus('오류: '+(err.message||String(err)), 'err');
+  }finally{
+    $('analyze').disabled = images.length===0;
+  }
+};
+
+// 일시적 서버 오류(429/500/502/503/529)는 자동 재시도
+async function callWithRetry(key, body, tries=3){
+  for(let i=0;i<tries;i++){
+    let res;
+    try{
+      res = await fetch(PROXY_URL,{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'x-access-code':key
+        },
+        body
+      });
+    }catch(e){
+      throw new Error('네트워크 오류 — 인터넷 연결과 서버 주소(config.js)를 확인하세요.');
+    }
+    let data={};
+    try{ data = await res.json(); }catch(_){}
+    if(res.ok) return data;
+
+    const msg = data?.error?.message || ('HTTP '+res.status);
+    if([429,500,502,503,529].includes(res.status) && i<tries-1){
+      setStatus(`서버 혼잡 (${res.status}) — 재시도 중… ${i+1}/${tries-1}`);
+      await new Promise(r=>setTimeout(r, 1500*(i+1)));
+      continue;
+    }
+    const rid = res.headers.get('request-id');
+    throw new Error(`${msg}  [HTTP ${res.status}${rid? ' · '+rid:''}]`);
+  }
+  throw new Error('재시도 후에도 실패했습니다. 잠시 뒤 다시 시도하세요.');
+}
+
+function normalizeItem(o){
+  const cat = CATS.some(c=>c.key===o.category)? o.category : '기타';
+  const conf = CONFS.includes(o.confidence)? o.confidence : '중';
+  return {
+    category:cat, location:o.location||'', material:o.material||'',
+    spec:o.spec||'', color:o.color||'', finish:o.finish||'',
+    brand:o.brand||'', model:o.model||'', confidence:conf, notes:o.notes||''
+  };
+}
+function sortItems(){
+  const ord = k => { const i=CATS.findIndex(c=>c.key===k); return i<0?99:i; };
+  items.sort((a,b)=> ord(a.category)-ord(b.category));
+}
+
+/* ============ table render ============ */
+function renderTable(){
+  const tb=$('tbody'); tb.innerHTML='';
+  let n=0;
+  items.forEach((it,idx)=>{
+    if(activeFilter!=='ALL' && it.category!==activeFilter) return;
+    n++;
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-no">${n}</td>
+      <td class="cat-cell">
+        <select data-f="category">
+          ${CATS.map(c=>`<option ${c.key===it.category?'selected':''}>${c.key}</option>`).join('')}
+        </select>
+      </td>
+      <td><textarea rows="1" data-f="location">${esc(it.location)}</textarea></td>
+      <td><textarea rows="1" data-f="material">${esc(it.material)}</textarea></td>
+      <td><input data-f="spec" value="${esc(it.spec)}"></td>
+      <td><input data-f="color" value="${esc(it.color)}"></td>
+      <td><input data-f="finish" value="${esc(it.finish)}"></td>
+      <td><input data-f="brand" value="${esc(it.brand)}" placeholder="—"></td>
+      <td><input data-f="model" value="${esc(it.model)}" placeholder="—"></td>
+      <td class="conf">
+        <select data-f="confidence" class="conf-${it.confidence}">
+          ${CONFS.map(c=>`<option ${c===it.confidence?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </td>
+      <td><textarea rows="1" data-f="notes">${esc(it.notes)}</textarea></td>
+      <td class="act no-print"><button title="삭제">✕</button></td>`;
+    // bind
+    tr.querySelectorAll('[data-f]').forEach(el=>{
+      el.oninput = ()=>{
+        it[el.dataset.f] = el.value;
+        if(el.dataset.f==='confidence'){ el.className='conf-'+el.value; }
+        if(el.dataset.f==='category'){ const sw=tr.querySelector('.swatch'); if(sw) sw.style.background=catColor(el.value); }
+      };
+      if(el.tagName==='TEXTAREA') autoGrow(el);
+    });
+    // category swatch
+    const sel=tr.querySelector('[data-f="category"]');
+    const sw=document.createElement('span'); sw.className='swatch'; sw.style.background=catColor(it.category);
+    sel.parentNode.insertBefore(sw, sel);
+    tr.querySelector('.act button').onclick=()=>{ items.splice(idx,1); renderTable(); buildFilters(); updateCount(); };
+    tb.appendChild(tr);
+  });
+  updateCount();
+}
+function autoGrow(el){
+  const fit=()=>{ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; };
+  el.addEventListener('input',fit); requestAnimationFrame(fit);
+}
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function updateCount(){ $('rowCount').textContent = `총 ${items.length}건`; }
+
+/* ============ filters ============ */
+function buildFilters(){
+  const present = [...new Set(items.map(i=>i.category))];
+  const box=$('filterChips'); box.innerHTML='';
+  const mk=(label,val)=>{
+    const c=document.createElement('span'); c.className='chip'+(activeFilter===val?' on':'');
+    c.textContent=label; c.onclick=()=>{ activeFilter=val; buildFilters(); renderTable(); };
+    box.appendChild(c);
+  };
+  mk('전체','ALL');
+  CATS.filter(c=>present.includes(c.key)).forEach(c=> mk(c.key, c.key));
+}
+
+/* ============ add row ============ */
+$('addRow').onclick=()=>{
+  items.push(normalizeItem({category: activeFilter==='ALL'?'기타':activeFilter, confidence:'중'}));
+  renderTable(); buildFilters();
+};
+
+/* ============ export ============ */
+const HEADERS = ['No.','구분','적용 위치/부위','마감재 종류','규격/사이즈','색상/톤','마감','제조사(추정)','모델/품번','신뢰도','비고'];
+function rows(){
+  return items.map((it,i)=>[i+1,it.category,it.location,it.material,it.spec,it.color,it.finish,it.brand,it.model,it.confidence,it.notes]);
+}
+function fileBase(){
+  const p=$('m_project').value||'프로젝트';
+  return `마감재리스트_${p}_${$('m_date').value}`.replace(/[\\/:*?"<>|]/g,'_');
+}
+function metaBlock(){
+  return [
+    ['마감재 스펙북 (FINISH SCHEDULE)'],
+    ['프로젝트', $('m_project').value, '', '발주처', $('m_client').value],
+    ['공간/구역', $('m_space').value, '', '작성일', $('m_date').value],
+    ['작성자', $('m_author').value, '', '비고', $('m_remark').value],
+    []
+  ];
+}
+
+$('expXlsx').onclick=()=>{
+  const aoa=[...metaBlock(), HEADERS, ...rows()];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:5},{wch:13},{wch:22},{wch:24},{wch:16},{wch:14},{wch:10},{wch:16},{wch:16},{wch:8},{wch:28}];
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:10}}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '마감재리스트');
+  XLSX.writeFile(wb, fileBase()+'.xlsx');
+};
+
+$('expCsv').onclick=()=>{
+  const all=[...metaBlock(), HEADERS, ...rows()];
+  const csv = all.map(r=> r.map(c=>{
+    const s=(c==null?'':String(c));
+    return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(',')).join('\r\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=fileBase()+'.csv'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+$('printBtn').onclick=()=>{
+  const pt=$('printTitle');
+  pt.innerHTML=`
+    <h3>마감재 스펙북 · FINISH SCHEDULE</h3>
+    <div class="pt-meta">
+      <span>프로젝트: <b>${esc($('m_project').value)||'-'}</b></span>
+      <span>발주처: <b>${esc($('m_client').value)||'-'}</b></span>
+      <span>공간: <b>${esc($('m_space').value)||'-'}</b></span>
+      <span>작성일: <b>${esc($('m_date').value)||'-'}</b></span>
+      <span>작성자: <b>${esc($('m_author').value)||'-'}</b></span>
+    </div>`;
+  const prev=activeFilter; activeFilter='ALL'; renderTable();
+  window.print();
+  activeFilter=prev; renderTable();
+};
+</script>
+</body>
+</html>
