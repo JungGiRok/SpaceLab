@@ -280,7 +280,9 @@
 <script src="config.js"></script>
 <script>
 /* ===== 사내 설정: config.js 에서 읽어옵니다 ===== */
-const PROXY_URL = (window.SPACE_TOOLS && window.SPACE_TOOLS.PROXY_URL) || "";
+const DEFAULT_PROXY = "https://morning-lake-5cb9space-lab-proxy.oh-roro-land.workers.dev";
+const CFG_PROXY = (window.SPACE_TOOLS && window.SPACE_TOOLS.PROXY_URL) || "";
+const PROXY_URL = (CFG_PROXY && !CFG_PROXY.includes("YOUR-")) ? CFG_PROXY : DEFAULT_PROXY;
 const CODE_KEY  = (window.SPACE_TOOLS && window.SPACE_TOOLS.STORAGE_KEY) || "space_tools_access_code";
 const PROXY_READY = PROXY_URL && !PROXY_URL.includes("YOUR-");
 
