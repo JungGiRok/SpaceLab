@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>SpaceLab · 공간브랜딩본부 업무 도구함</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --navy:#16245c;
+    --navy-deep:#0f1a45;
+    --ink:#1b1f2a;
+    --ink-soft:#5d6475;
+    --ink-faint:#9aa1b1;
+    --line:#e3e6ee;
+    --paper:#f5f6f9;
+    --surface:#ffffff;
+    --accent:#f0641e;
+    --accent-soft:#fff1e8;
+    --bad:#c4402f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Pretendard',-apple-system,system-ui,sans-serif;background:var(--paper);color:var(--ink);
+       min-height:100vh;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .hidden{display:none!important}
+
+  /* ---------- top bar ---------- */
+  .topbar{background:var(--surface);border-bottom:1px solid var(--line);height:58px;
+          display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+  .brand-mark{width:30px;height:30px;border-radius:4px;background:var(--navy);color:#fff;
+              font-weight:800;font-size:12px;letter-spacing:.02em;display:flex;align-items:center;justify-content:center}
+  .brand-name{font-size:15px;font-weight:700;color:var(--navy);line-height:1.1}
+  .brand-sub{font-size:10.5px;color:var(--ink-soft);margin-top:2px}
+  .logout{font-size:12px;color:var(--ink-soft);background:none;border:none;cursor:pointer;
+          text-decoration:underline;text-underline-offset:3px;font-family:inherit}
+  .logout:hover{color:var(--ink)}
+
+  /* ---------- hero ---------- */
+  .hero{background:var(--navy);color:#fff;padding:34px 28px 36px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-60px;width:420px;height:420px;border-radius:50%;
+               background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,0) 70%)}
+  .eyebrow{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.22em;color:#b9c2e6;margin-bottom:12px}
+  .eyebrow i{display:block;width:22px;height:2px;background:var(--accent)}
+  .eyebrow b{display:block;width:44px;height:1px;background:#5664a3}
+  .hero h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .hero p{font-size:13px;color:#c9d0ec;margin-top:8px}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 28px;
+           display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+  .search{width:260px;max-width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:4px;
+          font-family:inherit;font-size:13px;background:#fafbfc;outline:none}
+  .search:focus{border-color:var(--navy);background:#fff}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:7px 13px;border:1px solid var(--line);border-radius:4px;background:#fff;font-family:inherit;
+        font-size:12px;font-weight:600;color:var(--ink-soft);cursor:pointer}
+  .chip:hover{border-color:#c4c9d6;color:var(--ink)}
+  .chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+
+  /* ---------- content ---------- */
+  .content{padding:30px 28px 70px;max-width:1500px}
+  .section-head{display:inline-flex;align-items:baseline;gap:10px;padding-bottom:12px;margin-bottom:22px;
+                border-bottom:1px solid var(--line);position:relative}
+  .section-head::after{content:"";position:absolute;left:0;bottom:-1px;width:22px;height:2px;background:var(--accent)}
+  .section-num{font-size:18px;font-weight:800;color:var(--accent)}
+  .section-title{font-size:15px;font-weight:700}
+  .count{font-size:11px;font-weight:700;color:var(--ink-soft);background:#eceef4;border-radius:10px;padding:2px 8px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:20px 20px 18px;
+        display:flex;flex-direction:column;min-height:176px;transition:border-color .15s, box-shadow .15s}
+  .card:hover{border-color:#c6cbe0;box-shadow:0 6px 18px rgba(22,36,92,.07)}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+  .card-icon{font-size:24px;line-height:1}
+  .card-tag{font-size:10.5px;font-weight:700;color:var(--ink-soft);background:#f0f2f6;border-radius:3px;padding:3px 7px}
+  .card h3{font-size:14.5px;font-weight:700;color:var(--navy);margin-bottom:7px;letter-spacing:-.01em}
+  .card p{font-size:12px;color:var(--ink-soft);line-height:1.6;flex:1}
+  .card-foot{display:flex;justify-content:flex-end;margin-top:16px}
+  .open{display:inline-flex;align-items:center;gap:5px;background:var(--navy);color:#fff;text-decoration:none;
+        font-size:12px;font-weight:700;padding:8px 14px;border-radius:4px}
+  .open:hover{background:var(--navy-deep)}
+  .empty{grid-column:1/-1;text-align:center;color:var(--ink-faint);font-size:13px;padding:50px 0}
+
+  /* ---------- gate (login) ---------- */
+  .gate{min-height:calc(100vh - 58px);display:flex;align-items:center;justify-content:center;padding:24px;background:var(--navy)}
+  .gate-box{width:100%;max-width:380px;background:var(--surface);border-radius:8px;padding:34px 30px 30px;
+            box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .gate-box .eyebrow{color:var(--ink-faint)}
+  .gate-box .eyebrow b{background:var(--line)}
+  .gate-box h2{font-size:20px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
+  .gate-box .hint{font-size:12.5px;color:var(--ink-soft);margin:8px 0 22px;line-height:1.6}
+  .gate-box label{display:block;font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:6px}
+  .gate-box input{width:100%;padding:11px 12px;border:1px solid #cfd3de;border-radius:4px;font-size:14px;font-family:inherit;outline:none}
+  .gate-box input:focus{border-color:var(--navy)}
+  .enter{width:100%;margin-top:14px;padding:12px;border:none;border-radius:4px;background:var(--accent);color:#fff;
+         font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
+  .enter:hover{filter:brightness(.95)}
+  .enter:disabled{opacity:.6;cursor:wait}
+  .gate-err{color:var(--bad);font-size:12px;margin-top:12px;line-height:1.5}
+  .loading{color:var(--ink-faint);font-size:13px;padding:50px 0;text-align:center}
+
+  @media (max-width:640px){
+    .topbar,.hero,.toolbar,.content{padding-left:16px;padding-right:16px}
+    .search{width:100%}
+    .hero h1{font-size:21px}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="./">
+    <div class="brand-mark">SL</div>
+    <div>
+      <div class="brand-name">SpaceLab</div>
+      <div class="brand-sub">공간브랜딩본부 업무 도구</div>
+    </div>
+  </a>
+  <button class="logout hidden" id="logoutBtn" type="button">로그아웃</button>
+</header>
+
+<!-- 접속 코드 화면 -->
+<section class="gate hidden" id="gate">
+  <form class="gate-box" id="gateForm">
+    <div class="eyebrow"><i></i><b></b>SPACELAB</div>
+    <h2>업무 도구함 입장</h2>
+    <p class="hint">관리자에게 받은 사내 접속 코드를 입력하세요.<br>한 번 입력하면 이 브라우저에서는 다시 묻지 않습니다.</p>
+    <label for="codeInput">사내 접속 코드</label>
+    <input type="password" id="codeInput" autocomplete="current-password" placeholder="접속 코드 입력" required>
+    <button class="enter" id="enterBtn" type="submit">입장하기</button>
+    <div class="gate-err hidden" id="gateErr"></div>
+  </form>
+</section>
+
+<!-- 허브 화면 -->
+<main id="hub" class="hidden">
+  <section class="hero">
+    <div class="eyebrow"><i></i><b></b>HUB</div>
+    <h1>공간브랜딩본부 업무 도구함</h1>
+    <p>AI 업무 도구를 한 곳에서 찾고 바로 열어보세요.</p>
+  </section>
+
+  <div class="toolbar">
+    <input class="search" id="search" type="search" placeholder="이름 또는 설명 검색…">
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <section class="content">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <span class="section-title" id="sectionTitle">전체 도구</span>
+      <span class="count" id="count">0</span>
+    </div>
+    <div class="grid" id="grid"><div class="loading">불러오는 중…</div></div>
+  </section>
+</main>
+
+<script>
+/* ===== 설정 ===== */
+const DEFAULT_PROXY = "https://morning-lake-5cb9space-lab-proxy.oh-roro-land.workers.dev";
+const CODE_KEY = "space_tools_access_code";   // 도구들과 같은 이름 → 허브에서 입장하면 도구에서도 자동 입력
+
+const $ = id => document.getElementById(id);
+let tools = [];
+let activeCat = "전체";
+
+function store(get, val){
+  try{ return get ? localStorage.getItem(CODE_KEY) : (val==null ? localStorage.removeItem(CODE_KEY) : localStorage.setItem(CODE_KEY, val)); }
+  catch(_){ return null; }
+}
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function fetchTools(code){
+  let res;
+  try{
+    res = await fetch(DEFAULT_PROXY.replace(/\/+$/,"") + "/tools", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "x-access-code":code },
+      body:"{}"
+    });
+  }catch(e){
+    throw new Error("관리인 서버에 연결하지 못했습니다. 인터넷 연결을 확인하거나 잠시 후 다시 시도하세요.");
+  }
+  const data = await res.json().catch(() => null);
+  if(!res.ok) throw new Error(data?.error?.message || `오류가 발생했습니다 (${res.status})`);
+  if(!data || !Array.isArray(data.tools)) throw new Error("도구 목록을 받지 못했습니다. 관리인 코드(v3)가 배포됐는지 확인하세요.");
+  return data.tools;
+}
+
+function showGate(msg){
+  $("hub").classList.add("hidden");
+  $("logoutBtn").classList.add("hidden");
+  $("gate").classList.remove("hidden");
+  const err = $("gateErr");
+  if(msg){ err.textContent = msg; err.classList.remove("hidden"); } else { err.classList.add("hidden"); }
+  setTimeout(() => $("codeInput").focus(), 50);
+}
+function showHub(){
+  $("gate").classList.add("hidden");
+  $("hub").classList.remove("hidden");
+  $("logoutBtn").classList.remove("hidden");
+  buildChips();
+  render();
+}
+
+async function enter(code, silent){
+  $("enterBtn").disabled = true;
+  try{
+    tools = await fetchTools(code);
+    store(false, code);
+    showHub();
+  }catch(e){
+    if(silent && /접속 코드/.test(e.message)) store(false, null);
+    showGate(silent && /접속 코드/.test(e.message) ? "접속 코드가 변경되었습니다. 새 코드를 입력해주세요." : e.message);
+  }finally{
+    $("enterBtn").disabled = false;
+  }
+}
+
+function buildChips(){
+  const cats = ["전체", ...new Set(tools.map(t => t.cat).filter(Boolean))];
+  $("chips").innerHTML = cats.map(c =>
+    `<button type="button" class="chip${c===activeCat?' on':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join("");
+  $("chips").querySelectorAll(".chip").forEach(b => b.onclick = () => { activeCat = b.dataset.cat; buildChips(); render(); });
+}
+
+function render(){
+  const q = $("search").value.trim().toLowerCase();
+  const list = tools.filter(t =>
+    (activeCat === "전체" || t.cat === activeCat) &&
+    (!q || `${t.title} ${t.desc} ${t.cat}`.toLowerCase().includes(q)));
+  $("sectionTitle").textContent = activeCat === "전체" ? "전체 도구" : `${activeCat} 도구`;
+  $("count").textContent = list.length;
+  $("grid").innerHTML = list.length ? list.map(t => `
+    <article class="card">
+      <div class="card-top">
+        <span class="card-icon">${esc(t.icon || "🛠️")}</span>
+        <span class="card-tag">${esc(t.cat || "기타")}</span>
+      </div>
+      <h3>${esc(t.title)}</h3>
+      <p>${esc(t.desc)}</p>
+      <div class="card-foot"><a class="open" href="${esc(t.file)}">열기 →</a></div>
+    </article>`).join("")
+    : `<div class="empty">조건에 맞는 도구가 없습니다.</div>`;
+}
+
+$("search").addEventListener("input", render);
+$("gateForm").addEventListener("submit", e => { e.preventDefault(); const c = $("codeInput").value.trim(); if(c) enter(c, false); });
+$("logoutBtn").onclick = () => { store(false, null); tools = []; $("codeInput").value = ""; showGate(); };
+
+/* 시작: 저장된 코드가 있으면 바로 입장 */
+const saved = store(true);
+if(saved){ enter(saved, true); } else { showGate(); }
+</script>
+</body>
+</html>

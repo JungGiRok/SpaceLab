@@ -626,5 +626,8 @@ function showLoading(show) {
 function showError(msg) { $("errorMsg").textContent = msg; $("errorMsg").classList.remove("hidden"); }
 function hideError() { $("errorMsg").classList.add("hidden"); }
 </script>
+<!-- 허브로 돌아가기 -->
+<a href="./" class="hub-back" style="position:fixed;left:16px;bottom:16px;z-index:1000;background:#16245c;color:#fff;text-decoration:none;font:600 12px/1 'Pretendard','Noto Sans KR',sans-serif;padding:10px 14px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.18)">← 도구함</a>
+<style>@media print{.hub-back{display:none!important}}</style>
 </body>
 </html>
