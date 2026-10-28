@@ -242,7 +242,7 @@ function render(){
       </div>
       <h3>${esc(t.title)}</h3>
       <p>${esc(t.desc)}</p>
-      <div class="card-foot"><a class="open" href="${esc(t.file)}">열기 →</a></div>
+      <div class="card-foot"><a class="open" href="${esc(t.file)}"${/^https?:/i.test(t.file) ? ' target="_blank" rel="noopener"' : ''}>${/^https?:/i.test(t.file) ? '열기 ↗' : '열기 →'}</a></div>
     </article>`).join("")
     : `<div class="empty">조건에 맞는 도구가 없습니다.</div>`;
 }
