@@ -1,0 +1,1222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SpaceLab Render</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#0e0f10; --surface:#151618; --surface2:#1c1d20; --surface3:#25272b;
+  --line:#2a2c30; --line2:#3a3c42;
+  --text:#ecebe8; --muted:#9c9ea4; --faint:#6a6c72;
+  --accent:#e3a24a; --accent2:#f2be70; --accentInk:#1c1307; --accentSoft:rgba(227,162,74,.13);
+  --danger:#ff6a57; --ok:#5fcf8f;
+  --font:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:13px/1.45 var(--font);-webkit-font-smoothing:antialiased;display:grid;grid-template-rows:52px 1fr;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+
+/* ── top bar ── */
+.topbar{display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.01em;white-space:nowrap}
+.brand-mark{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--accent2),#b8742a);display:grid;place-items:center}
+.brand small{font-weight:500;color:var(--faint);margin-left:2px}
+.proj{flex:1;max-width:340px;display:flex;align-items:center;gap:8px;margin-left:12px}
+.proj label{color:var(--faint);font-size:11.5px;white-space:nowrap}
+.proj input{flex:1;min-width:0;background:transparent;border:1px solid transparent;border-radius:7px;padding:6px 9px;font-weight:600}
+.proj input:hover{border-color:var(--line)} .proj input:focus{outline:none;border-color:var(--line2);background:var(--surface2)}
+.spacer{flex:1}
+.conn{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--danger)} .dot.ok{background:var(--ok)}
+.icon-btn{display:inline-flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12.5px}
+.icon-btn:hover{border-color:var(--line2);background:var(--surface3)}
+.icon-btn svg{width:15px;height:15px}
+
+/* ── app grid ── */
+.app{display:grid;grid-template-columns:78px minmax(0,1fr) 352px;min-height:0}
+.rail{border-right:1px solid var(--line);background:var(--surface);padding:10px 8px;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+.rail button{background:none;border:0;border-radius:10px;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--muted);font-size:11px;line-height:1.2;text-align:center}
+.rail button svg{width:21px;height:21px}
+.rail button:hover{background:var(--surface2);color:var(--text)}
+.rail button.on{background:var(--accentSoft);color:var(--accent2)}
+.rail .sep{height:1px;background:var(--line);margin:6px 6px}
+.rail .grp{font-size:9.5px;letter-spacing:.12em;color:var(--faint);text-align:center;margin:6px 0 2px;font-weight:700}
+
+/* ── stage ── */
+.stage{display:grid;grid-template-rows:46px minmax(0,1fr) 104px;min-width:0;min-height:0}
+.stage-bar{display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line);overflow-x:auto}
+.seg{display:inline-flex;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:2px}
+.seg button{background:none;border:0;border-radius:6px;padding:5px 11px;font-size:12px;color:var(--muted);white-space:nowrap}
+.seg button.on{background:var(--surface3);color:var(--text)}
+.seg button:disabled{opacity:.35;cursor:default}
+.mask-tools{display:flex;align-items:center;gap:8px;padding-left:10px;border-left:1px solid var(--line);white-space:nowrap}
+.mask-tools .lbl{font-size:11.5px;color:var(--faint)}
+.mask-tools input[type=range]{width:90px;accent-color:var(--accent)}
+.tiny-btn{background:var(--surface2);border:1px solid var(--line);border-radius:7px;padding:5px 9px;font-size:12px;color:var(--muted);white-space:nowrap}
+.tiny-btn:hover{color:var(--text);border-color:var(--line2)}
+.tiny-btn.on{background:var(--accentSoft);border-color:var(--accent);color:var(--accent2)}
+.mask-hint{font-size:11.5px;color:var(--faint);white-space:nowrap}
+
+.canvas-wrap{position:relative;display:grid;place-items:center;min-height:0;overflow:hidden;
+  background:radial-gradient(circle at 1px 1px,#202124 1px,transparent 0) 0 0/18px 18px,var(--bg)}
+.drop{width:min(560px,86%);border:1.5px dashed var(--line2);border-radius:16px;padding:44px 28px;text-align:center;background:rgba(21,22,24,.85);transition:.15s}
+.drop.over{border-color:var(--accent);background:var(--accentSoft)}
+.drop h2{margin:14px 0 6px;font-size:17px;font-weight:700}
+.drop p{margin:0;color:var(--muted)}
+.drop .kbd{display:inline-block;border:1px solid var(--line2);border-radius:5px;padding:0 5px;font-size:11px;color:var(--muted)}
+.drop .icon-btn{margin-top:18px}
+.drop-ico{width:46px;height:46px;margin:0 auto;border-radius:12px;background:var(--surface2);display:grid;place-items:center;color:var(--accent2)}
+
+.viewer{position:relative;box-shadow:0 10px 40px rgba(0,0,0,.45);user-select:none;-webkit-user-select:none}
+.viewer img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;pointer-events:none}
+.after-layer{position:absolute;inset:0;clip-path:inset(0 0 0 50%)}
+.divider{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);cursor:ew-resize}
+.divider::after{content:'';position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.4);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23222' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 7l-5 5 5 5M15 7l5 5-5 5'/%3E%3C/svg%3E");background-size:18px;background-position:center;background-repeat:no-repeat}
+#maskCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:.5;touch-action:none;cursor:none}
+.tag{position:absolute;top:10px;padding:3px 8px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.08em;pointer-events:none;backdrop-filter:blur(4px)}
+.tag.l{left:10px} .tag.r{right:10px}
+.cursor{position:absolute;border:1.5px solid #fff;border-radius:50%;pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.5);transform:translate(-50%,-50%)}
+
+.film{border-top:1px solid var(--line);background:var(--surface);display:flex;gap:8px;padding:10px 12px;overflow-x:auto;align-items:center}
+.film-empty{color:var(--faint);font-size:12px;padding-left:4px}
+.tile{position:relative;flex:0 0 auto;height:80px;aspect-ratio:4/3;border-radius:8px;overflow:hidden;border:2px solid transparent;background:var(--surface2);padding:0}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .b{position:absolute;left:4px;bottom:4px;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,.7);color:#fff}
+.tile .b.up{background:rgba(255,255,255,.88);color:#111}
+.tile.view{border-color:var(--accent)}
+.tile.base::before{content:'기준';position:absolute;top:4px;right:4px;font-size:9.5px;font-weight:800;padding:1px 5px;border-radius:4px;background:var(--accent);color:var(--accentInk);z-index:1}
+.tile.pending{display:grid;place-items:center;color:var(--muted);font-size:11px;border:1px dashed var(--line2);background:var(--surface2)}
+.spin{width:18px;height:18px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:sp 0.9s linear infinite;margin:0 auto 5px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ── panel ── */
+.panel{border-left:1px solid var(--line);background:var(--surface);display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0}
+.panel-head{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.panel-head h3{margin:0;font-size:15px;font-weight:700}
+.panel-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.panel-body{overflow-y:auto;padding:16px 18px 8px}
+.panel-foot{border-top:1px solid var(--line);padding:12px 18px 16px;background:var(--surface)}
+.field{margin-bottom:15px}
+.lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.lbl em{font-style:normal;color:var(--faint);font-weight:500}
+.inp,textarea.inp,select.inp{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none}
+.inp:focus{border-color:var(--line2);background:var(--surface3)}
+textarea.inp{resize:vertical;min-height:62px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{background:var(--surface2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:5px 11px;font-size:12px}
+.chips button:hover{color:var(--text);border-color:var(--line2)}
+.chips button.on{background:var(--accentSoft);border-color:var(--accent);color:var(--accent2)}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
+.sw:first-of-type{border-top:0}
+.sw span{font-size:12.5px}
+.sw small{display:block;color:var(--faint);font-size:11px}
+.sw input{appearance:none;-webkit-appearance:none;width:34px;height:20px;border-radius:999px;background:var(--line2);position:relative;flex:0 0 auto;cursor:pointer;transition:.15s;margin:0}
+.sw input::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
+.sw input:checked{background:var(--accent)} .sw input:checked::after{left:16px}
+.box{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:2px 12px}
+.refs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ref{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--surface2);border:1px solid var(--line)}
+.ref img{width:100%;height:100%;object-fit:cover}
+.ref button{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;font-size:12px;line-height:18px;padding:0}
+.ref-add{aspect-ratio:1;border-radius:8px;border:1.5px dashed var(--line2);background:none;color:var(--faint);font-size:20px;display:grid;place-items:center}
+.ref-add:hover{border-color:var(--accent);color:var(--accent2)}
+.note{font-size:11.5px;color:var(--faint);margin-top:6px}
+.callout{background:var(--accentSoft);border:1px solid rgba(227,162,74,.35);color:var(--accent2);border-radius:9px;padding:9px 11px;font-size:12px;margin-bottom:14px}
+.callout.warn{background:rgba(255,106,87,.09);border-color:rgba(255,106,87,.35);color:#ffa497}
+details.pp{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
+details.pp summary{cursor:pointer;color:var(--muted);font-size:12px;list-style:none}
+details.pp summary::before{content:'▸ ';} details.pp[open] summary::before{content:'▾ ';}
+details.pp pre{white-space:pre-wrap;word-break:break-word;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:240px;overflow:auto}
+.out-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.out-row .lbl{margin-bottom:4px}
+.btn-primary{width:100%;border:0;border-radius:10px;padding:12px;background:var(--accent);color:var(--accentInk);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary:hover{background:var(--accent2)}
+.btn-primary:disabled{opacity:.45;cursor:default}
+.res-card{margin-top:10px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.res-card .t{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+.res-card .t b{color:var(--text)}
+.res-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.res-actions button{background:var(--surface3);border:1px solid var(--line);border-radius:7px;padding:7px 6px;font-size:12px}
+.res-actions button:hover{border-color:var(--line2)}
+.res-actions button.main{grid-column:1/-1;background:var(--accentSoft);border-color:rgba(227,162,74,.45);color:var(--accent2);font-weight:700}
+.res-actions button.del{color:#ff9c8f}
+
+/* ── dialog ── */
+dialog{border:1px solid var(--line2);border-radius:14px;background:var(--surface);color:var(--text);padding:0;width:min(560px,94vw);max-height:90vh}
+dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
+.dlg-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.dlg-head h3{margin:0;font-size:15px}
+.dlg-body{padding:18px 20px;overflow-y:auto;max-height:calc(90vh - 130px)}
+.dlg-foot{padding:12px 20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.dlg-foot .r{display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface2);border-radius:8px;padding:8px 14px}
+.btn:hover{border-color:var(--line2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accentInk);font-weight:700}
+#testMsg{font-size:12px;color:var(--muted)}
+
+.toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:50;align-items:center;pointer-events:none}
+.toast{background:var(--surface3);border:1px solid var(--line2);border-radius:9px;padding:9px 14px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:min(560px,92vw)}
+.toast.error{border-color:rgba(255,106,87,.6);color:#ffb3a9}
+
+/* ── mobile ── */
+@media (max-width:960px){
+  body{overflow:auto;display:block}
+  .topbar{position:sticky;top:0;z-index:5;height:52px}
+  .proj{margin-left:0}
+  .proj label,.conn span{display:none}
+  .app{display:flex;flex-direction:column}
+  .rail{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto;padding:6px}
+  .rail button{flex:0 0 68px}
+  .rail .sep,.rail .grp{display:none}
+  .stage{grid-template-rows:auto 62vh 100px}
+  .stage-bar{padding:8px 12px;flex-wrap:wrap;height:auto}
+  .panel{border-left:0;border-top:1px solid var(--line);display:block}
+  .panel-body{overflow:visible}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1c1307" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg></div>
+    SpaceLab Render <small>2.0</small>
+  </div>
+  <div class="proj">
+    <label for="projectName">프로젝트</label>
+    <input id="projectName" placeholder="예) SS MY Utama Store" autocomplete="off">
+  </div>
+  <div class="spacer"></div>
+  <div class="conn"><i class="dot" id="connDot"></i><span id="connText">API 미설정</span></div>
+  <button class="icon-btn" id="openSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>설정</button>
+</header>
+
+<div class="app">
+  <nav class="rail" id="rail">
+    <div class="grp">CREATE</div>
+    <button data-tool="render" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>실사 렌더</button>
+    <div class="sep"></div>
+    <div class="grp">EDIT</div>
+    <button data-tool="people"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-1a6 6 0 0 1 12 0v1"/><circle cx="17.5" cy="8.5" r="2.3"/><path d="M17 14.2a4.5 4.5 0 0 1 4.5 4.5V21"/></svg>인물 추가</button>
+    <button data-tool="products"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V4h16v17M4 10h16M4 15.5h16"/><path d="M7 10V7.5h3V10M13 15.5v-3h4v3M7.5 21v-2.5h3V21"/></svg>제품 진열</button>
+    <button data-tool="edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L11 15.8 7 17l1.2-4z"/><path d="M5 21c-1.5 0-2-1-2-2 2 0 2.5-2 4-2 1.1 0 2 .9 2 2s-1.5 2-4 2z"/></svg>부분 편집</button>
+    <button data-tool="atmos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>분위기·조명</button>
+    <div class="sep"></div>
+    <div class="grp">FINISH</div>
+    <button data-tool="upscale"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>업스케일</button>
+  </nav>
+
+  <main class="stage">
+    <div class="stage-bar">
+      <div class="seg" id="viewSeg">
+        <button data-mode="base" class="on">기준 이미지</button>
+        <button data-mode="after">결과</button>
+        <button data-mode="compare">비교</button>
+      </div>
+      <div class="mask-tools" id="maskTools" hidden>
+        <span class="lbl">영역</span>
+        <button class="tiny-btn on" id="brushBtn" title="브러시 (B)">브러시</button>
+        <button class="tiny-btn" id="eraserBtn" title="지우개 (E)">지우개</button>
+        <input type="range" id="brushSize" min="8" max="160" value="44" title="브러시 크기 ( [ / ] )">
+        <button class="tiny-btn" id="clearMask">지우기</button>
+        <span class="mask-hint" id="maskHint"></span>
+      </div>
+      <div class="spacer"></div>
+      <button class="tiny-btn" id="newUpload">+ 새 이미지</button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="drop" id="drop">
+        <div class="drop-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
+        <h2>SketchUp 투시도를 올려주세요</h2>
+        <p>이미지를 끌어다 놓거나, 클립보드 이미지를 <span class="kbd">Ctrl</span>+<span class="kbd">V</span>로 붙여넣기</p>
+        <button class="icon-btn" id="pickFile">파일 선택</button>
+      </div>
+      <div class="viewer" id="viewer" hidden>
+        <img id="imgBefore" alt="">
+        <div class="after-layer" id="afterLayer"><img id="imgAfter" alt=""></div>
+        <canvas id="maskCanvas"></canvas>
+        <div class="divider" id="divider"></div>
+        <span class="tag l" id="tagL">기준 이미지</span>
+        <span class="tag r" id="tagR" hidden>AFTER</span>
+        <div class="cursor" id="cursor" hidden></div>
+      </div>
+    </div>
+
+    <div class="film" id="film"><span class="film-empty">작업 히스토리가 여기에 쌓여요. 업로드 원본과 생성 결과를 눌러 비교하거나 이어서 편집할 수 있어요.</span></div>
+  </main>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <h3 id="toolTitle">실사 렌더</h3>
+      <p id="toolDesc">레이아웃·형태·마감재는 그대로, DSLR 사진 같은 실사 투시도로 변환합니다.</p>
+    </div>
+
+    <div class="panel-body">
+      <div class="callout warn" id="setupCallout" hidden>먼저 오른쪽 위 <b>설정</b>에서 Gemini API 키(또는 사내 프록시)를 입력해 주세요.</div>
+
+      <!-- RENDER -->
+      <section class="tool-panel" data-tool="render">
+        <div class="field">
+          <div class="lbl">브랜드</div>
+          <input class="inp" id="rBrand" list="brandList" placeholder="예) Shake Shack">
+          <datalist id="brandList"><option>Paris Baguette</option><option>Shake Shack</option><option>La Grillía</option><option>City Deli</option><option>Coffee@Works</option></datalist>
+        </div>
+        <div class="field">
+          <div class="lbl">입지 유형</div>
+          <div class="chips" data-name="rSpace">
+            <button data-v="mall" class="on">쇼핑몰 내</button><button data-v="street">로드숍</button><button data-v="foodcourt">푸드코트</button><button data-v="office">오피스·로비</button><button data-v="flagship">플래그십</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">국가·도시 <em>외부 풍경·인물에 반영</em></div>
+          <input class="inp" id="rLocation" placeholder="예) Kuala Lumpur, Malaysia">
+        </div>
+        <div class="field">
+          <div class="lbl">조명</div>
+          <div class="chips" data-name="rLight">
+            <button data-v="mall" class="on">몰 실내조명</button><button data-v="day">주간 자연광</button><button data-v="warm">저녁 웜톤</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">인물</div>
+          <div class="chips" data-name="rPeople">
+            <button data-v="none">없음</button><button data-v="few" class="on">약간 (2–4명)</button><button data-v="some">보통 (5–10명)</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">마감재·디테일 메모 <em>선택</em></div>
+          <textarea class="inp" id="rDetails" placeholder="예) 바닥은 패턴 테라조, 천장은 오크 루버, 카운터 전면 브라스 마감, 간접조명 3000K"></textarea>
+        </div>
+        <div class="box">
+          <label class="sw"><span>빈 디지털 사이니지 채우기<small>검은 화면·메뉴보드에 광고 그래픽 생성</small></span><input type="checkbox" id="rFillScreens"></label>
+          <div class="field" id="screenField" hidden style="margin:2px 0 10px">
+            <input class="inp" id="rScreenContent" placeholder="예) 버거 클로즈업 광고, 'BRISKET & CHUCK' 문구">
+          </div>
+        </div>
+        <div class="field" style="margin-top:15px">
+          <div class="lbl">분위기 레퍼런스 <em>선택 · 조명/톤만 참고</em></div>
+          <div class="refs" id="styleRefs"></div>
+          <input type="file" id="styleInput" accept="image/*" hidden>
+        </div>
+      </section>
+
+      <!-- PEOPLE -->
+      <section class="tool-panel" data-tool="people" hidden>
+        <div class="callout">실사 렌더 결과를 <b>기준 이미지</b>로 지정한 뒤 쓰면 가장 자연스러워요. 영역을 칠하면 그 안에만 배치합니다.</div>
+        <div class="field">
+          <div class="lbl">인원</div>
+          <div class="chips" data-name="pDensity">
+            <button data-v="few">2–4명</button><button data-v="medium" class="on">5–10명</button><button data-v="busy">붐비게</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">인물 구성</div>
+          <div class="chips" data-name="pEthnicity">
+            <button data-v="kr" class="on">한국</button><button data-v="sea">동남아(SG·MY)</button><button data-v="west">서구권</button><button data-v="mixed">다양하게</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">연령대</div>
+          <div class="chips" data-name="pAge">
+            <button data-v="young" class="on">20–30대 중심</button><button data-v="office">직장인</button><button data-v="family">가족 포함</button><button data-v="all">다양하게</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">행동 <em>복수 선택</em></div>
+          <div class="chips" data-name="pActs" data-multi>
+            <button data-v="dining" class="on">식사·대화</button><button data-v="ordering" class="on">주문 대기</button><button data-v="walking" class="on">지나가기</button><button data-v="staff">직원 응대</button><button data-v="browsing">진열 상품 고르기</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">옷차림 계절</div>
+          <div class="chips" data-name="pSeason">
+            <button data-v="auto" class="on">자동</button><button data-v="summer">여름</button><button data-v="mid">봄·가을</button><button data-v="winter">겨울</button>
+          </div>
+        </div>
+        <div class="box">
+          <label class="sw"><span>걷는 사람 모션 블러<small>건축 사진의 장노출 느낌</small></span><input type="checkbox" id="pBlur" checked></label>
+          <label class="sw"><span>사이니지·카운터 가리지 않기</span><input type="checkbox" id="pClear" checked></label>
+        </div>
+        <div class="field" style="margin-top:15px">
+          <div class="lbl">추가 지시 <em>선택</em></div>
+          <textarea class="inp" id="pExtra" placeholder="예) 왼쪽 벤치석에 커플 2명, 카운터 앞 줄 3명"></textarea>
+        </div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section class="tool-panel" data-tool="products" hidden>
+        <div class="callout">매대 위치를 <b>브러시로 칠해 주세요.</b> 칠한 영역 안에만 제품이 들어가고, 나머지는 원본 그대로 유지돼요.</div>
+        <div class="field">
+          <div class="lbl">제품 사진 <em>최대 6장</em></div>
+          <div class="refs" id="productRefs"></div>
+          <input type="file" id="productInput" accept="image/*" multiple hidden>
+          <div class="note">누끼 컷이나 깔끔한 단품 사진일수록 정확해요.</div>
+        </div>
+        <div class="field">
+          <div class="lbl">진열대 유형</div>
+          <div class="chips" data-name="kFixture">
+            <button data-v="bread3" class="on">BREAD-3단</button><button data-v="island">평대·아일랜드</button><button data-v="showcase">냉장 쇼케이스</button><button data-v="oem">OEM (카운터 앞)</button><button data-v="drink">음료 쿨러</button><button data-v="counter">카운터 상판</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">진열량</div>
+          <div class="chips" data-name="kFill">
+            <button data-v="sparse">여유 있게</button><button data-v="normal" class="on">적당히</button><button data-v="full">가득 (오픈 직후)</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">배치</div>
+          <div class="chips" data-name="kArrange">
+            <button data-v="grouped" class="on">품목별 정렬</button><button data-v="mixed">섞어서</button><button data-v="hero">대표 상품 강조</button>
+          </div>
+        </div>
+        <div class="box">
+          <label class="sw"><span>가격표·쇼카드 추가</span><input type="checkbox" id="kTags"></label>
+          <label class="sw"><span>트레이·바스켓 등 집기 함께</span><input type="checkbox" id="kTrays" checked></label>
+        </div>
+        <div class="field" style="margin-top:15px">
+          <div class="lbl">제품 설명 <em>사진이 없으면 필수</em></div>
+          <textarea class="inp" id="kDesc" placeholder="예) 소금빵·크루아상·바게트, 상단은 패키지 쿠키 박스"></textarea>
+        </div>
+      </section>
+
+      <!-- EDIT -->
+      <section class="tool-panel" data-tool="edit" hidden>
+        <div class="callout">바꿀 부분을 <b>브러시로 칠하고</b> 무엇을 할지 적어주세요. 칠한 영역 밖은 원본 픽셀을 그대로 유지합니다.</div>
+        <div class="field">
+          <div class="lbl">빠른 지시</div>
+          <div class="chips" id="editPresets">
+            <button data-p="Remove the object in this area and fill the background naturally.">물체 제거</button>
+            <button data-p="Add lush, natural indoor plants in planters suited to the space.">식물 추가</button>
+            <button data-p="Change the material of this surface to ">소재 변경</button>
+            <button data-p="Add warm indirect LED cove lighting here with a soft glow.">간접조명</button>
+            <button data-p="Replace the graphic on this screen/panel with ">그래픽 교체</button>
+            <button data-p="Fix distorted or unrealistic details in this area so it looks like a real photograph.">어색한 부분 수정</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">지시 내용</div>
+          <textarea class="inp" id="eText" rows="4" placeholder="예) 이 벽면을 연한 그린 타일로 바꿔줘 / 의자를 원목 의자로 교체"></textarea>
+          <div class="note">한국어로 써도 됩니다.</div>
+        </div>
+      </section>
+
+      <!-- ATMOS -->
+      <section class="tool-panel" data-tool="atmos" hidden>
+        <div class="field">
+          <div class="lbl">시간대</div>
+          <div class="chips" data-name="aTime">
+            <button data-v="keep" class="on">유지</button><button data-v="morning">아침</button><button data-v="noon">한낮</button><button data-v="golden">골든아워</button><button data-v="dusk">해질녘</button><button data-v="night">야간</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">날씨 <em>외부가 보일 때</em></div>
+          <div class="chips" data-name="aWeather">
+            <button data-v="keep" class="on">유지</button><button data-v="clear">맑음</button><button data-v="overcast">흐림</button><button data-v="rain">비</button><button data-v="snow">눈</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">계절</div>
+          <div class="chips" data-name="aSeason">
+            <button data-v="keep" class="on">유지</button><button data-v="spring">봄</button><button data-v="summer">여름</button><button data-v="autumn">가을</button><button data-v="winter">겨울</button><button data-v="xmas">크리스마스 시즌</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">실내 조명 색온도</div>
+          <div class="chips" data-name="aTemp">
+            <button data-v="keep" class="on">유지</button><button data-v="2700">2700K</button><button data-v="3000">3000K</button><button data-v="3500">3500K</button><button data-v="4000">4000K</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">분위기 강도</div>
+          <div class="chips" data-name="aMood">
+            <button data-v="subtle">은은하게</button><button data-v="standard" class="on">표준</button><button data-v="dramatic">드라마틱</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">추가 지시 <em>선택</em></div>
+          <textarea class="inp" id="aExtra" placeholder="예) 매거진 촬영처럼 따뜻하고 선명하게"></textarea>
+        </div>
+      </section>
+
+      <!-- UPSCALE -->
+      <section class="tool-panel" data-tool="upscale" hidden>
+        <div class="callout">디자인이 확정된 컷에만 쓰는 걸 추천해요. 구도·디자인은 바꾸지 않고 해상도와 질감만 끌어올립니다.</div>
+        <div class="field">
+          <div class="lbl">출력 해상도</div>
+          <div class="chips" data-name="uSize">
+            <button data-v="2K">2K</button><button data-v="4K" class="on">4K</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lbl">보정 강도</div>
+          <div class="chips" data-name="uLevel">
+            <button data-v="preserve">원본 보존</button><button data-v="balanced" class="on">균형</button><button data-v="detail">디테일 강화</button>
+          </div>
+        </div>
+        <div class="box">
+          <label class="sw"><span>인물 보정 (Fix People)<small>일그러진 얼굴·손 바로잡기</small></span><input type="checkbox" id="uFix" checked></label>
+          <label class="sw"><span>사이니지 글자 선명하게</span><input type="checkbox" id="uText" checked></label>
+        </div>
+      </section>
+
+      <details class="pp" id="promptDetails">
+        <summary>프롬프트 미리보기</summary>
+        <pre id="promptPreview"></pre>
+      </details>
+    </div>
+
+    <div class="panel-foot">
+      <div class="out-row">
+        <div>
+          <div class="lbl">결과 수</div>
+          <select class="inp" id="optCount"><option value="1">1장</option><option value="2" selected>2장</option><option value="3">3장</option><option value="4">4장</option></select>
+        </div>
+        <div id="sizeWrap">
+          <div class="lbl">해상도</div>
+          <select class="inp" id="optSize"><option>1K</option><option selected>2K</option><option>4K</option></select>
+        </div>
+      </div>
+      <label class="sw" id="keepWrap" style="padding-top:0" hidden><span>칠한 영역 밖은 원본 유지<small>결과를 마스크로 합성 — 형태 변형 방지</small></span><input type="checkbox" id="keepOutside" checked></label>
+      <button class="btn-primary" id="genBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg><span id="genLabel">렌더 생성</span></button>
+      <div class="res-card" id="resCard" hidden>
+        <div class="t" id="resInfo"></div>
+        <div class="res-actions">
+          <button class="main" id="useAsBase">이 결과로 이어서 편집 →</button>
+          <button id="dlBtn">다운로드</button>
+          <button id="sheetBtn">비교 시트 저장</button>
+          <button id="copyPromptBtn">사용 프롬프트 복사</button>
+          <button class="del" id="delBtn">삭제</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<dialog id="settingsDlg">
+  <div class="dlg-head"><h3>설정</h3><button class="tiny-btn" data-close>닫기</button></div>
+  <div class="dlg-body">
+    <div class="field">
+      <div class="lbl">연결 방식</div>
+      <div class="chips" data-name="sMode" id="sModeChips">
+        <button data-v="direct" class="on">Gemini API 키 직접</button><button data-v="proxy">사내 프록시 (Cloudflare Worker 등)</button>
+      </div>
+    </div>
+    <div id="directFields">
+      <div class="field">
+        <div class="lbl">Gemini API 키 <em>이 브라우저에만 저장</em></div>
+        <input class="inp" id="sKey" type="password" placeholder="AIza..." autocomplete="off">
+      </div>
+    </div>
+    <div id="proxyFields" hidden>
+      <div class="field">
+        <div class="lbl">프록시 URL</div>
+        <input class="inp" id="sProxy" placeholder="https://render-proxy.xxx.workers.dev">
+        <div class="note">요청은 <code>{프록시}/v1beta/models/{모델}:generateContent</code>로 전달되고, 접속 코드는 <code>X-Access-Code</code> 헤더로 보냅니다.</div>
+      </div>
+      <div class="field">
+        <div class="lbl">사내 접속 코드</div>
+        <input class="inp" id="sCode" type="password" autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <div class="lbl">이미지 모델</div>
+      <select class="inp" id="sModel">
+        <option value="gemini-3-pro-image-preview">Nano Banana Pro · gemini-3-pro-image-preview (고품질·4K)</option>
+        <option value="gemini-3.1-flash-image-preview">Nano Banana 2 · gemini-3.1-flash-image-preview (빠름)</option>
+        <option value="gemini-2.5-flash-image">Nano Banana · gemini-2.5-flash-image (저렴, 해상도 옵션 없음)</option>
+        <option value="custom">직접 입력…</option>
+      </select>
+      <input class="inp" id="sCustomModel" placeholder="모델 ID 입력" style="margin-top:6px" hidden>
+      <div class="note">모델 ID는 Google 업데이트에 따라 바뀔 수 있어요. ‘연결 테스트’로 확인하세요.</div>
+    </div>
+    <div class="field">
+      <div class="lbl">실사 렌더 기본 프롬프트 <button class="tiny-btn" id="resetPrompt" type="button">기본값 복원</button></div>
+      <textarea class="inp" id="sPrompt" rows="7"></textarea>
+      <div class="note">‘실사 렌더’ 탭 맨 앞에 그대로 들어가고, 프로젝트 정보가 뒤에 붙습니다.</div>
+    </div>
+    <div class="field">
+      <div class="lbl">비교 시트 라벨</div>
+      <div class="out-row" style="margin:0">
+        <input class="inp" id="sLabelL" placeholder="3D 스케치업 룩">
+        <input class="inp" id="sLabelR" placeholder="AI 렌더 활용 룩">
+      </div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <div style="display:flex;align-items:center;gap:10px"><button class="btn" id="testBtn">연결 테스트</button><span id="testMsg"></span></div>
+    <div class="r"><button class="btn pri" id="saveSettings">저장</button></div>
+  </div>
+</dialog>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+/* ───────── config ───────── */
+const BASE_PROMPT_DEFAULT = 'Generate this SketchUp reference image into a realistic photo, similar to a DSLR camera photo with ultra HD resolution, without changing the layout, geometry, or material textures in the reference image, while reflecting the specific project details. The form, design, materials/finishes, composition, and all other elements must remain exactly as they are. No modifications are allowed.';
+const settings = Object.assign({
+  mode: 'direct', apiKey: '', proxyUrl: '', accessCode: '',
+  model: 'gemini-3-pro-image-preview', customModel: '',
+  basePrompt: BASE_PROMPT_DEFAULT, labelL: '3D 스케치업 룩', labelR: 'AI 렌더 활용 룩'
+}, store.get('slr.settings', {}));
+
+const TOOLS = {
+  render:   { title: '실사 렌더',   desc: '레이아웃·형태·마감재는 그대로, DSLR 사진 같은 실사 투시도로 변환합니다.', mask: false, gen: '렌더 생성' },
+  people:   { title: '인물 추가',   desc: '공간 스케일과 조명에 맞는 사람을 자연스럽게 배치합니다.', mask: 'optional', gen: '인물 넣기' },
+  products: { title: '제품 진열',   desc: '제품 사진을 매대·쇼케이스에 실제처럼 진열합니다.', mask: 'recommended', gen: '진열하기' },
+  edit:     { title: '부분 편집',   desc: '칠한 영역만 지시대로 바꾸는 인페인팅 편집입니다.', mask: 'required', gen: '영역 편집' },
+  atmos:    { title: '분위기·조명', desc: '형태는 그대로 두고 시간대·날씨·계절·조명만 바꿉니다.', mask: false, gen: '분위기 적용' },
+  upscale:  { title: '업스케일',    desc: '확정 컷을 2K/4K로 키우고 질감·인물을 정리합니다.', mask: false, gen: '업스케일' }
+};
+
+const MAP = {
+  space: {
+    mall: 'store unit inside a shopping mall (the mall corridor is visible outside the open storefront)',
+    street: 'street-front store',
+    foodcourt: 'food court unit with shared seating',
+    office: 'store in an office building lobby',
+    flagship: 'flagship store'
+  },
+  light: {
+    mall: 'bright, even shopping-mall ambient lighting combined with the store\'s own warm accent lighting',
+    day: 'natural daylight entering through the glazing, balanced with interior lighting',
+    warm: 'warm evening atmosphere, interior lights glowing (about 3000K)'
+  },
+  rPeople: {
+    none: 'Do not add any people.',
+    few: 'Add a few (2–4) natural customers at a realistic scale, candid and not looking at the camera; do not cover signage or the counter.',
+    some: 'Add 5–10 natural customers at a realistic scale (some seated, some walking with slight motion blur), candid and not looking at the camera; do not cover signage or the counter.'
+  },
+  density: { few: '2–4 people', medium: '5–10 people', busy: 'a lively crowd of roughly 12–20 people' },
+  eth: {
+    kr: 'Korean people',
+    sea: 'Southeast Asian people as seen in Singapore and Malaysia (a natural mix of Chinese, Malay and Indian appearance)',
+    west: 'Western people of varied backgrounds',
+    mixed: 'a natural international mix of people'
+  },
+  age: {
+    young: 'mostly in their 20s and 30s',
+    office: 'office workers in smart-casual and business attire',
+    family: 'a mix of young adults, couples and families with children',
+    all: 'a natural mix of ages'
+  },
+  acts: {
+    dining: 'seated at tables eating and chatting',
+    ordering: 'queuing and ordering at the counter',
+    walking: 'walking past or entering the store',
+    staff: 'staff in neat brand uniforms working behind the counter',
+    browsing: 'browsing and picking products from the displays'
+  },
+  season: { auto: 'clothing appropriate to the location and season', summer: 'light summer clothing', mid: 'spring/autumn clothing with light layers', winter: 'winter coats and knitwear' },
+  fixture: {
+    bread3: 'three-tier wall-mounted bread display shelf',
+    island: 'flat island / table display for bakery items',
+    showcase: 'refrigerated glass display case for cakes and desserts',
+    oem: 'small impulse-buy display in front of the checkout counter (jellies, candies, small packaged snacks)',
+    drink: 'glass-door beverage cooler',
+    counter: 'counter top'
+  },
+  fill: { sparse: 'neatly with generous spacing (premium boutique look)', normal: 'well stocked and tidy', full: 'abundantly and fully stocked, as at opening time' },
+  arrange: { grouped: 'grouped by product type in neat rows', mixed: 'in a natural, mixed arrangement', hero: 'with the hero product featured prominently at eye level and the rest around it' },
+  time: { morning: 'soft early-morning daylight', noon: 'bright midday daylight', golden: 'warm golden-hour sunlight with long soft shadows', dusk: 'dusk / blue hour outside with the interior lights glowing warmly', night: 'night time: dark exterior, the space lit only by its interior lighting' },
+  weather: { clear: 'clear weather', overcast: 'soft overcast sky', rain: 'rainy weather with wet reflective surfaces outside', snow: 'light snowfall outside' },
+  seasonA: { spring: 'spring (fresh greenery, blossoms outside)', summer: 'summer (lush greenery, strong light)', autumn: 'autumn (warm foliage tones outside)', winter: 'winter (bare trees, cold light outside)', xmas: 'Christmas season (tasteful festive decorations that suit the brand, no change to architecture)' },
+  mood: { subtle: 'Keep the change subtle and natural.', standard: 'Apply the change clearly but naturally.', dramatic: 'Make the atmosphere cinematic and dramatic while staying photorealistic.' },
+  upLevel: {
+    preserve: 'Preserve the image exactly; only increase resolution, clarity and reduce noise.',
+    balanced: 'Increase resolution and refine fine textures (wood grain, stone, terrazzo, fabric, metal, foliage) without changing the design.',
+    detail: 'Increase resolution and add rich photographic micro-detail and crisp material textures, as if shot on a high-end full-frame camera, without changing the design.'
+  }
+};
+const PRESERVE = 'Keep the camera position, perspective, framing, layout, geometry, proportions, materials, finishes, colors, signage, logos and lettering exactly as in the base image.';
+
+/* ───────── state ───────── */
+const state = { tool: 'render', baseId: null, viewId: null, mode: 'base', brush: 'paint', hasMask: false, pending: [] };
+const items = new Map();
+let productRefs = [];
+let styleRef = null;
+let cmp = 50;
+
+/* ───────── storage (IndexedDB history) ───────── */
+const MAX_HISTORY = 40;
+const DB = {
+  db: null,
+  open() { return new Promise(res => { try { const r = indexedDB.open('spacelab-render', 1); r.onupgradeneeded = () => r.result.createObjectStore('items', { keyPath: 'id' }); r.onsuccess = () => { DB.db = r.result; res(true); }; r.onerror = () => res(false); } catch (e) { res(false); } }); },
+  put(it) { try { DB.db && DB.db.transaction('items', 'readwrite').objectStore('items').put(it); } catch (e) {} },
+  del(id) { try { DB.db && DB.db.transaction('items', 'readwrite').objectStore('items').delete(id); } catch (e) {} },
+  all() { return new Promise(res => { try { if (!DB.db) return res([]); const r = DB.db.transaction('items').objectStore('items').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); } catch (e) { res([]); } }); }
+};
+
+/* ───────── utils ───────── */
+const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+const loadImage = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('이미지를 불러올 수 없습니다.')); i.src = src; });
+function drawScaled(img, maxEdge, bg = '#fff') {
+  let w = img.naturalWidth, h = img.naturalHeight;
+  const s = Math.min(1, maxEdge / Math.max(w, h));
+  w = Math.round(w * s); h = Math.round(h * s);
+  const c = mk(w, h), x = c.getContext('2d');
+  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, w, h); }
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(img, 0, 0, w, h);
+  return c;
+}
+async function fileToData(file, maxEdge) {
+  const url = URL.createObjectURL(file);
+  try { const img = await loadImage(url); const c = drawScaled(img, maxEdge); return { dataUrl: c.toDataURL('image/jpeg', 0.92), w: c.width, h: c.height }; }
+  finally { URL.revokeObjectURL(url); }
+}
+async function makeThumb(dataUrl) { const img = await loadImage(dataUrl); return drawScaled(img, 280).toDataURL('image/jpeg', 0.8); }
+function dataUrlToPart(dataUrl) {
+  const i = dataUrl.indexOf(',');
+  const mime = (dataUrl.slice(5, i).split(';')[0]) || 'image/jpeg';
+  return { inline_data: { mime_type: mime, data: dataUrl.slice(i + 1) } };
+}
+const v = id => (($('#' + id) || {}).value || '').trim();
+const chk = id => !!($('#' + id) || {}).checked;
+function cv(name) {
+  const g = $(`.chips[data-name="${name}"]`); if (!g) return null;
+  const on = $$('button.on', g).map(b => b.dataset.v);
+  return g.hasAttribute('data-multi') ? on : on[0];
+}
+function setChip(name, val) { const g = $(`.chips[data-name="${name}"]`); if (!g) return; $$('button', g).forEach(b => b.classList.toggle('on', b.dataset.v === val)); }
+function toast(msg, type = '') {
+  const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg;
+  $('#toasts').appendChild(t); setTimeout(() => t.remove(), type === 'error' ? 7000 : 3200);
+}
+const fmtTime = ts => new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+const modelId = () => settings.model === 'custom' ? (settings.customModel || '').trim() : settings.model;
+const supportsImageSize = m => !/2\.5|2\.0/.test(m);
+const configured = () => settings.mode === 'proxy' ? !!settings.proxyUrl : !!settings.apiKey;
+
+/* ───────── Gemini call ───────── */
+function endpoint(path) {
+  const headers = { 'Content-Type': 'application/json' };
+  let url;
+  if (settings.mode === 'proxy') {
+    if (!settings.proxyUrl) throw new Error('설정에서 프록시 URL을 입력해 주세요.');
+    url = settings.proxyUrl.replace(/\/+$/, '') + path;
+    if (settings.accessCode) headers['X-Access-Code'] = settings.accessCode;
+  } else {
+    if (!settings.apiKey) throw new Error('설정에서 Gemini API 키를 입력해 주세요.');
+    url = 'https://generativelanguage.googleapis.com' + path;
+    headers['x-goog-api-key'] = settings.apiKey;
+  }
+  return { url, headers };
+}
+async function callGemini(parts, imageSize) {
+  const model = modelId();
+  if (!model) throw new Error('설정에서 모델을 선택해 주세요.');
+  const { url, headers } = endpoint(`/v1beta/models/${encodeURIComponent(model)}:generateContent`);
+  const generationConfig = { responseModalities: ['TEXT', 'IMAGE'] };
+  if (imageSize && supportsImageSize(model)) generationConfig.imageConfig = { imageSize };
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig }) });
+  let json = null; try { json = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error((json && json.error && json.error.message) || `요청 실패 (HTTP ${res.status})`);
+  const cand = json && json.candidates && json.candidates[0];
+  if (!cand) { const br = json && json.promptFeedback && json.promptFeedback.blockReason; throw new Error(br ? `요청이 차단되었습니다 (${br})` : '응답에 결과가 없습니다.'); }
+  let img = null; const texts = [];
+  for (const p of (cand.content && cand.content.parts) || []) {
+    if (p.thought) continue;
+    const d = p.inlineData || p.inline_data;
+    if (d && d.data) img = { mime: d.mimeType || d.mime_type || 'image/png', data: d.data };
+    else if (p.text) texts.push(p.text);
+  }
+  if (!img) throw new Error(texts.join(' ').slice(0, 220) || `이미지가 생성되지 않았습니다 (${cand.finishReason || 'unknown'})`);
+  return img;
+}
+
+/* ───────── prompts ───────── */
+function buildPrompt(tool, ctx) {
+  const L = [];
+  const maskLine = 'Change only the region tinted red in the region-guide image; everything outside it must remain identical. Never reproduce the red tint.';
+  if (tool === 'render') {
+    L.push(settings.basePrompt.trim(), '', 'Project details:');
+    const brand = v('rBrand'); if (brand) L.push(`- Brand: ${brand}`);
+    const proj = v('projectName'); if (proj) L.push(`- Project: ${proj}`);
+    L.push(`- Space: ${MAP.space[cv('rSpace')]}`);
+    const loc = v('rLocation'); if (loc) L.push(`- Location: ${loc} (reflect it in the exterior view and in any people)`);
+    L.push(`- Lighting: ${MAP.light[cv('rLight')]}`);
+    const det = v('rDetails'); if (det) L.push(`- Materials & notes: ${det}`);
+    L.push('', 'Rendering requirements:',
+      '- The input is a SketchUp viewport export. Convert flat colors, outlines and placeholder textures into physically accurate real materials with soft global illumination, realistic reflections and contact shadows, while every object stays exactly where it is.',
+      '- Keep all signage, logos, lettering and menu text exactly as shown and legible.',
+      '- Keep the same lens, field of view and two-point perspective (vertical lines stay vertical).',
+      '- ' + MAP.rPeople[cv('rPeople')]);
+    if (chk('rFillScreens')) L.push(`- Blank or black digital screens and menu boards: fill them with ${v('rScreenContent') || 'on-brand food advertising graphics'}, in the brand's graphic style.`);
+    if (ctx.styleRef) L.push('- Use the mood reference image only for lighting, color grading and photographic atmosphere. Never copy its layout, geometry, furniture or materials.');
+    L.push('- Output one photorealistic, high-resolution architectural interior photograph.');
+  }
+  else if (tool === 'people') {
+    const acts = (cv('pActs') || []).map(a => MAP.acts[a]);
+    L.push('Add realistic people to this interior photograph.', PRESERVE, '',
+      `People: ${MAP.density[cv('pDensity')]}, ${MAP.eth[cv('pEthnicity')]}, ${MAP.age[cv('pAge')]}, wearing ${MAP.season[cv('pSeason')]}.`);
+    if (acts.length) L.push(`Activities: ${acts.join('; ')}.`);
+    L.push('Scale every person correctly for an eye-level camera at about 1.5 m (heads of standing adults close to the horizon line). Match the scene lighting, color temperature and shadows; feet are grounded with soft contact shadows. Natural candid poses, nobody looks at the camera. Faces and hands must look natural.');
+    if (chk('pBlur')) L.push('Give walking people a slight long-exposure motion blur, as in professional architectural photography; seated people stay sharp.');
+    if (chk('pClear')) L.push('Do not block logos, signage, menu boards or the main counter.');
+    const ex = v('pExtra'); if (ex) L.push(`Additional direction: ${ex}`);
+    if (ctx.hasMask) L.push('Place people only inside the region tinted red in the region-guide image. ' + 'Never reproduce the red tint.');
+  }
+  else if (tool === 'products') {
+    L.push(`Place products on the ${MAP.fixture[cv('kFixture')]} in this store photograph.`, PRESERVE, '');
+    if (ctx.products) L.push(`The ${ctx.products} product reference image(s) show the exact products. Reproduce their shape, color, packaging and proportions faithfully, at realistic scale relative to the fixture.`);
+    const d = v('kDesc'); if (d) L.push(`Products: ${d}.`);
+    L.push(`Stocking: ${MAP.fill[cv('kFill')]}, ${MAP.arrange[cv('kArrange')]}.`,
+      'Products sit physically on the shelves/trays with correct perspective, reflections on glass and soft contact shadows, lit by the existing store lighting.');
+    if (chk('kTrays')) L.push('Use appropriate display trays, baskets or risers where natural.');
+    L.push(chk('kTags') ? 'Add small, neat price/name cards in a style that suits the brand.' : 'Do not add price tags or text.');
+    if (ctx.hasMask) L.push(maskLine);
+  }
+  else if (tool === 'edit') {
+    L.push('Edit this photograph.', maskLine, `Instruction: ${v('eText') || '(no instruction)'}`,
+      'Outside the marked region keep the camera, perspective, geometry, materials, signage and lighting exactly as they are. Blend the edit seamlessly with matching perspective, lighting, shadows and grain so it looks like part of the original photo.');
+  }
+  else if (tool === 'atmos') {
+    L.push('Relight and re-atmosphere this interior photograph.', 'Keep the camera position, perspective, framing, layout, geometry, proportions, materials, finishes, signage, logos and lettering exactly as in the base image.', 'Change only lighting, the sky/exterior view and atmosphere:');
+    const t = cv('aTime'), w = cv('aWeather'), s = cv('aSeason'), k = cv('aTemp');
+    if (t !== 'keep') L.push(`- Time of day: ${MAP.time[t]}.`);
+    if (w !== 'keep') L.push(`- Weather: ${MAP.weather[w]}.`);
+    if (s !== 'keep') L.push(`- Season: ${MAP.seasonA[s]}.`);
+    if (k !== 'keep') L.push(`- Interior artificial lighting color temperature: ${k}K.`);
+    if (t === 'keep' && w === 'keep' && s === 'keep' && k === 'keep') L.push('- Improve the lighting to look like a professional architectural photograph.');
+    L.push('- ' + MAP.mood[cv('aMood')]);
+    const ex = v('aExtra'); if (ex) L.push(`- Additional direction: ${ex}`);
+    L.push('Keep exposure balanced like a professional architectural photo: no blown highlights, readable shadows, true-to-life colors.');
+  }
+  else if (tool === 'upscale') {
+    L.push('Re-render this exact image at higher resolution as a crisp, professional architectural photograph.', PRESERVE,
+      'Do not add, remove or move anything. ' + MAP.upLevel[cv('uLevel')]);
+    if (chk('uFix')) L.push('Repair any distorted faces, hands or bodies of people so they look natural, without changing their position, pose or clothing.');
+    if (chk('uText')) L.push('Make signage, logos and lettering sharp and clean, keeping the exact same text.');
+  }
+  return L.join('\n');
+}
+function promptCtx(tool) {
+  return { hasMask: !!TOOLS[tool].mask && state.hasMask, styleRef: tool === 'render' && !!styleRef, products: tool === 'products' ? productRefs.length : 0 };
+}
+let ppTimer;
+function updatePreview() {
+  clearTimeout(ppTimer);
+  ppTimer = setTimeout(() => { $('#promptPreview').textContent = buildPrompt(state.tool, promptCtx(state.tool)); }, 120);
+}
+
+/* ───────── mask ───────── */
+const maskCanvas = $('#maskCanvas');
+const mctx = maskCanvas.getContext('2d');
+let painting = false, last = null;
+function brushPx() { return +$('#brushSize').value; }
+function maskPaintable() { return !!TOOLS[state.tool].mask && state.mode === 'base' && !!items.get(state.baseId); }
+function ptOf(e) { const r = maskCanvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * maskCanvas.width / r.width, y: (e.clientY - r.top) * maskCanvas.height / r.height }; }
+function strokeSeg(a, b) {
+  const r = maskCanvas.getBoundingClientRect();
+  mctx.globalCompositeOperation = state.brush === 'erase' ? 'destination-out' : 'source-over';
+  mctx.strokeStyle = 'rgb(255,40,40)'; mctx.lineCap = 'round'; mctx.lineJoin = 'round';
+  mctx.lineWidth = brushPx() * maskCanvas.width / r.width;
+  mctx.beginPath(); mctx.moveTo(a.x, a.y); mctx.lineTo(b.x + 0.01, b.y); mctx.stroke();
+}
+function computeHasMask() {
+  if (!maskCanvas.width) { state.hasMask = false; return; }
+  const d = mctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+  let found = false;
+  for (let i = 3; i < d.length; i += 64) { if (d[i] > 10) { found = true; break; } }
+  state.hasMask = found; updateMaskHint(); updatePreview();
+}
+function clearMask() { mctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height); state.hasMask = false; updateMaskHint(); updatePreview(); }
+function updateMaskHint() {
+  const t = TOOLS[state.tool].mask;
+  let s = '';
+  if (state.mode !== 'base') s = '영역을 칠하려면 ‘브러시’를 누르세요';
+  else if (state.hasMask) s = '영역 지정됨';
+  else s = t === 'required' ? '편집할 영역을 칠해 주세요' : t === 'recommended' ? '매대 영역을 칠하면 더 정확해요' : '칠하지 않으면 전체에 적용';
+  $('#maskHint').textContent = s;
+}
+maskCanvas.addEventListener('pointerdown', e => {
+  if (!maskPaintable()) return;
+  painting = true; maskCanvas.setPointerCapture(e.pointerId); last = ptOf(e); strokeSeg(last, last);
+});
+maskCanvas.addEventListener('pointermove', e => {
+  moveCursor(e);
+  if (!painting) return; const p = ptOf(e); strokeSeg(last, p); last = p;
+});
+const endPaint = () => { if (painting) { painting = false; computeHasMask(); } };
+maskCanvas.addEventListener('pointerup', endPaint);
+maskCanvas.addEventListener('pointercancel', endPaint);
+maskCanvas.addEventListener('pointerleave', () => { $('#cursor').hidden = true; });
+function moveCursor(e) {
+  const c = $('#cursor'); if (!maskPaintable()) { c.hidden = true; return; }
+  const r = $('#viewer').getBoundingClientRect();
+  c.hidden = false; const s = brushPx();
+  c.style.width = c.style.height = s + 'px';
+  c.style.left = (e.clientX - r.left) + 'px'; c.style.top = (e.clientY - r.top) + 'px';
+}
+function setBrush(m) { state.brush = m; $('#brushBtn').classList.toggle('on', m === 'paint'); $('#eraserBtn').classList.toggle('on', m === 'erase'); if (state.mode !== 'base') { state.mode = 'base'; renderStage(); } }
+$('#brushBtn').onclick = () => setBrush('paint');
+$('#eraserBtn').onclick = () => setBrush('erase');
+$('#clearMask').onclick = clearMask;
+
+async function makeGuide(base, maskSnap) {
+  const img = await loadImage(base.dataUrl);
+  const c = mk(base.w, base.h), x = c.getContext('2d');
+  x.drawImage(img, 0, 0, base.w, base.h);
+  x.globalAlpha = 0.55; x.drawImage(maskSnap, 0, 0, base.w, base.h);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+function cloneCanvas(src) { const c = mk(src.width, src.height); c.getContext('2d').drawImage(src, 0, 0); return c; }
+async function compositeWithMask(base, resultUrl, maskSnap) {
+  const [bi, ri] = await Promise.all([loadImage(base.dataUrl), loadImage(resultUrl)]);
+  const W = base.w, H = base.h;
+  const out = mk(W, H), o = out.getContext('2d'); o.drawImage(bi, 0, 0, W, H);
+  const feather = Math.max(3, Math.round(Math.max(W, H) * 0.005));
+  const m = mk(W, H), mc = m.getContext('2d');
+  // dilate a little so the feather does not eat into the edit
+  mc.filter = `blur(${feather}px)`;
+  for (let i = 0; i < 2; i++) mc.drawImage(maskSnap, 0, 0, W, H);
+  const t = mk(W, H), tc = t.getContext('2d');
+  tc.drawImage(ri, 0, 0, W, H);
+  tc.globalCompositeOperation = 'destination-in'; tc.drawImage(m, 0, 0);
+  o.drawImage(t, 0, 0);
+  return out.toDataURL('image/jpeg', 0.95);
+}
+
+/* ───────── stage / viewer ───────── */
+const viewer = $('#viewer');
+function displayItem() {
+  const base = items.get(state.baseId), view = items.get(state.viewId);
+  if (view && state.mode === 'compare') return { before: items.get(view.parentId) || base, after: view };
+  if (view && state.mode === 'after') return { before: view, after: null };
+  return { before: base, after: null };
+}
+function layoutViewer() {
+  const { before } = displayItem(); if (!before) return;
+  const wrap = $('#canvasWrap'); const pad = 28;
+  const W = Math.max(50, wrap.clientWidth - pad * 2), H = Math.max(50, wrap.clientHeight - pad * 2);
+  const s = Math.min(W / before.w, H / before.h);
+  viewer.style.width = Math.floor(before.w * s) + 'px'; viewer.style.height = Math.floor(before.h * s) + 'px';
+}
+new ResizeObserver(layoutViewer).observe($('#canvasWrap'));
+function setCmp(p) { cmp = Math.max(0, Math.min(100, p)); $('#afterLayer').style.clipPath = `inset(0 0 0 ${cmp}%)`; $('#divider').style.left = cmp + '%'; }
+let dragging = false;
+viewer.addEventListener('pointerdown', e => {
+  if (state.mode !== 'compare' || e.target === maskCanvas && maskPaintable()) return;
+  dragging = true; viewer.setPointerCapture(e.pointerId); const r = viewer.getBoundingClientRect(); setCmp((e.clientX - r.left) / r.width * 100);
+});
+viewer.addEventListener('pointermove', e => { if (!dragging) return; const r = viewer.getBoundingClientRect(); setCmp((e.clientX - r.left) / r.width * 100); });
+viewer.addEventListener('pointerup', () => { dragging = false; });
+
+function renderStage() {
+  const base = items.get(state.baseId), view = items.get(state.viewId);
+  if (!view && state.mode !== 'base') state.mode = 'base';
+  $('#drop').hidden = !!base; viewer.hidden = !base;
+  $$('#viewSeg button').forEach(b => { b.classList.toggle('on', b.dataset.mode === state.mode); b.disabled = !base || (b.dataset.mode !== 'base' && !view); });
+  const toolMask = !!TOOLS[state.tool].mask;
+  $('#maskTools').hidden = !toolMask || !base;
+  $('#keepWrap').hidden = !toolMask;
+  if (!base) { renderResCard(); return; }
+  // mask canvas size follows base
+  if (maskCanvas.width !== base.w || maskCanvas.height !== base.h) { maskCanvas.width = base.w; maskCanvas.height = base.h; state.hasMask = false; }
+  const { before, after } = displayItem();
+  if ($('#imgBefore').getAttribute('src') !== before.dataUrl) $('#imgBefore').src = before.dataUrl;
+  $('#afterLayer').hidden = !after; $('#divider').hidden = !after; $('#tagR').hidden = !after;
+  if (after && $('#imgAfter').getAttribute('src') !== after.dataUrl) $('#imgAfter').src = after.dataUrl;
+  $('#tagL').textContent = after ? 'BEFORE' : (state.mode === 'base' ? '기준 이미지' : '결과');
+  maskCanvas.hidden = !(toolMask && state.mode === 'base');
+  viewer.style.cursor = state.mode === 'compare' ? 'ew-resize' : 'default';
+  layoutViewer(); updateMaskHint(); renderResCard();
+}
+$$('#viewSeg button').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; renderStage(); saveState(); });
+
+/* ───────── filmstrip ───────── */
+function renderFilm() {
+  const f = $('#film'); f.innerHTML = '';
+  const list = [...items.values()].sort((a, b) => b.ts - a.ts);
+  if (!list.length && !state.pending.length) { f.innerHTML = '<span class="film-empty">작업 히스토리가 여기에 쌓여요. 업로드 원본과 생성 결과를 눌러 비교하거나 이어서 편집할 수 있어요.</span>'; return; }
+  for (const p of state.pending) {
+    const t = document.createElement('div'); t.className = 'tile pending';
+    t.innerHTML = `<div><div class="spin"></div><span data-pend="${p.id}">${TOOLS[p.tool].title} · ${Math.round((Date.now() - p.start) / 1000)}s</span></div>`;
+    f.appendChild(t);
+  }
+  for (const it of list) {
+    const t = document.createElement('button'); t.className = 'tile';
+    if (it.id === state.baseId) t.classList.add('base');
+    if (it.id === state.viewId) t.classList.add('view');
+    t.title = it.kind === 'upload' ? `원본 업로드 · ${fmtTime(it.ts)}` : `${TOOLS[it.tool].title} · ${fmtTime(it.ts)}`;
+    t.innerHTML = `<img src="${it.thumb || it.dataUrl}" alt=""><span class="b ${it.kind === 'upload' ? 'up' : ''}">${it.kind === 'upload' ? '원본' : TOOLS[it.tool].title}</span>`;
+    t.onclick = () => selectItem(it.id);
+    f.appendChild(t);
+  }
+}
+setInterval(() => { for (const p of state.pending) { const el = $(`[data-pend="${p.id}"]`); if (el) el.textContent = `${TOOLS[p.tool].title} · ${Math.round((Date.now() - p.start) / 1000)}s`; } }, 1000);
+
+function selectItem(id) {
+  const it = items.get(id); if (!it) return;
+  if (it.kind === 'upload') { setBase(id); }
+  else { state.viewId = id; state.mode = 'compare'; setCmp(50); }
+  renderAll(); saveState();
+}
+function setBase(id) {
+  if (state.baseId !== id) { state.baseId = id; const b = items.get(id); maskCanvas.width = b.w; maskCanvas.height = b.h; state.hasMask = false; }
+  state.viewId = null; state.mode = 'base';
+}
+function renderAll() { renderStage(); renderFilm(); updatePreview(); }
+
+function renderResCard() {
+  const view = items.get(state.viewId);
+  $('#resCard').hidden = !view;
+  if (!view) return;
+  $('#resInfo').innerHTML = `선택한 결과 · <b>${TOOLS[view.tool].title}</b> · ${fmtTime(view.ts)} · ${view.w}×${view.h}`;
+}
+function addItem(it) {
+  items.set(it.id, it); DB.put(it);
+  if (items.size > MAX_HISTORY) {
+    const keep = new Set([state.baseId, state.viewId]);
+    const sorted = [...items.values()].sort((a, b) => a.ts - b.ts);
+    for (const o of sorted) { if (items.size <= MAX_HISTORY) break; if (keep.has(o.id)) continue; items.delete(o.id); DB.del(o.id); }
+  }
+}
+function saveState() { store.set('slr.state', { baseId: state.baseId, viewId: state.viewId, mode: state.mode }); }
+
+/* ───────── upload ───────── */
+async function handleBaseFile(file) {
+  if (!file || !/^image\//.test(file.type)) return toast('이미지 파일만 올릴 수 있어요.', 'error');
+  try {
+    const d = await fileToData(file, 2048);
+    const it = { id: uid(), kind: 'upload', dataUrl: d.dataUrl, w: d.w, h: d.h, ts: Date.now(), parentId: null, name: file.name || 'pasted' };
+    it.thumb = await makeThumb(d.dataUrl);
+    addItem(it); setBase(it.id); renderAll(); saveState();
+    if (!configured()) $('#setupCallout').hidden = false;
+  } catch (e) { toast(e.message, 'error'); }
+}
+$('#pickFile').onclick = $('#newUpload').onclick = () => $('#fileInput').click();
+$('#fileInput').onchange = e => { handleBaseFile(e.target.files[0]); e.target.value = ''; };
+const wrapEl = $('#canvasWrap');
+['dragenter', 'dragover'].forEach(ev => wrapEl.addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => wrapEl.addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.remove('over'); }));
+wrapEl.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) handleBaseFile(f); });
+document.addEventListener('paste', e => {
+  if (e.target.closest && e.target.closest('input,textarea')) return;
+  const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type));
+  if (f) { e.preventDefault(); handleBaseFile(f); }
+});
+
+/* refs (style / products) */
+function renderRefs() {
+  const sr = $('#styleRefs'); sr.innerHTML = '';
+  if (styleRef) { const d = document.createElement('div'); d.className = 'ref'; d.innerHTML = `<img src="${styleRef.dataUrl}" alt=""><button title="삭제">×</button>`; d.querySelector('button').onclick = () => { styleRef = null; renderRefs(); updatePreview(); }; sr.appendChild(d); }
+  else { const a = document.createElement('button'); a.className = 'ref-add'; a.textContent = '+'; a.onclick = () => $('#styleInput').click(); sr.appendChild(a); }
+  const pr = $('#productRefs'); pr.innerHTML = '';
+  productRefs.forEach((p, i) => { const d = document.createElement('div'); d.className = 'ref'; d.innerHTML = `<img src="${p.dataUrl}" alt=""><button title="삭제">×</button>`; d.querySelector('button').onclick = () => { productRefs.splice(i, 1); renderRefs(); updatePreview(); }; pr.appendChild(d); });
+  if (productRefs.length < 6) { const a = document.createElement('button'); a.className = 'ref-add'; a.textContent = '+'; a.onclick = () => $('#productInput').click(); pr.appendChild(a); }
+}
+$('#styleInput').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; styleRef = await fileToData(f, 1024); renderRefs(); updatePreview(); };
+$('#productInput').onchange = async e => {
+  const fs = [...e.target.files]; e.target.value = '';
+  for (const f of fs) { if (productRefs.length >= 6) break; const d = await fileToData(f, 1024); d.name = (f.name || '').replace(/\.[^.]+$/, ''); productRefs.push(d); }
+  renderRefs(); updatePreview();
+};
+
+/* ───────── tools / panel ───────── */
+function setTool(t) {
+  state.tool = t;
+  $$('#rail button').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+  $$('.tool-panel').forEach(p => p.hidden = p.dataset.tool !== t);
+  $('#toolTitle').textContent = TOOLS[t].title; $('#toolDesc').textContent = TOOLS[t].desc;
+  $('#genLabel').textContent = TOOLS[t].gen;
+  $('#sizeWrap').style.visibility = t === 'upscale' ? 'hidden' : 'visible';
+  if (TOOLS[t].mask && state.mode !== 'base' && !items.get(state.viewId)) state.mode = 'base';
+  renderStage(); updatePreview();
+}
+$$('#rail button').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+$$('.chips[data-name]').forEach(g => g.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (g.hasAttribute('data-multi')) b.classList.toggle('on');
+  else $$('button', g).forEach(x => x.classList.toggle('on', x === b));
+  if (g.id === 'sModeChips') syncModeFields();
+  updatePreview();
+}));
+$('#editPresets').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const ta = $('#eText'); ta.value = b.dataset.p; ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); updatePreview();
+});
+$('.panel-body').addEventListener('input', updatePreview);
+$('#projectName').addEventListener('input', e => { store.set('slr.project', e.target.value); updatePreview(); });
+$('#rFillScreens').addEventListener('change', e => { $('#screenField').hidden = !e.target.checked; });
+
+/* ───────── generate ───────── */
+async function generate() {
+  const base = items.get(state.baseId);
+  if (!base) return toast('먼저 SketchUp 투시도를 올려 주세요.', 'error');
+  if (!configured()) { openSettings(); return toast('API 연결 정보를 먼저 입력해 주세요.', 'error'); }
+  const tool = state.tool;
+  const ctx = promptCtx(tool);
+  if (tool === 'edit' && !state.hasMask) return toast('편집할 영역을 브러시로 칠해 주세요.', 'error');
+  if (tool === 'edit' && !v('eText')) return toast('무엇을 바꿀지 지시 내용을 적어 주세요.', 'error');
+  if (tool === 'products' && !productRefs.length && !v('kDesc')) return toast('제품 사진을 올리거나 제품 설명을 적어 주세요.', 'error');
+  if (tool === 'products' && !state.hasMask) toast('매대 영역을 칠하지 않아 이미지 전체를 보고 배치합니다.');
+
+  const prompt = buildPrompt(tool, ctx);
+  const parts = [{ text: 'Base image (the photo / model view to work on):' }, dataUrlToPart(base.dataUrl)];
+  let maskSnap = null;
+  if (ctx.hasMask) {
+    maskSnap = cloneCanvas(maskCanvas);
+    parts.push({ text: 'Region-guide image (same view; the red-tinted area marks the region to work in):' }, dataUrlToPart(await makeGuide(base, maskSnap)));
+  }
+  if (ctx.styleRef) parts.push({ text: 'Mood reference image (lighting / color grading only):' }, dataUrlToPart(styleRef.dataUrl));
+  if (tool === 'products') productRefs.forEach((p, i) => parts.push({ text: `Product reference ${i + 1}${p.name ? ` (${p.name})` : ''}:` }, dataUrlToPart(p.dataUrl)));
+  parts.push({ text: prompt });
+
+  const composite = ctx.hasMask && chk('keepOutside');
+  const size = tool === 'upscale' ? cv('uSize') : $('#optSize').value;
+  const n = tool === 'upscale' ? 1 : +$('#optCount').value;
+  let shown = false;
+
+  await Promise.allSettled(Array.from({ length: n }, async () => {
+    const pend = { id: uid(), tool, start: Date.now() };
+    state.pending.push(pend); renderFilm();
+    try {
+      const img = await callGemini(parts, size);
+      let url = `data:${img.mime};base64,${img.data}`;
+      if (composite) url = await compositeWithMask(base, url, maskSnap);
+      const im = await loadImage(url);
+      const it = { id: uid(), kind: 'result', dataUrl: url, w: im.naturalWidth, h: im.naturalHeight, tool, parentId: base.id, ts: Date.now(), prompt, project: v('projectName') };
+      it.thumb = await makeThumb(url);
+      addItem(it);
+      if (!shown) { shown = true; state.viewId = it.id; state.mode = 'compare'; setCmp(50); }
+    } catch (e) {
+      toast(e.message || String(e), 'error');
+    } finally {
+      state.pending = state.pending.filter(p => p !== pend);
+      renderAll(); saveState();
+    }
+  }));
+}
+$('#genBtn').onclick = generate;
+
+/* ───────── result actions ───────── */
+async function downloadDataUrl(dataUrl, name) {
+  const blob = await (await fetch(dataUrl)).blob();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const safe = s => (s || 'render').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_').slice(0, 60);
+const stamp = ts => { const d = new Date(ts); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; };
+$('#useAsBase').onclick = () => { const id = state.viewId; if (!id) return; setBase(id); renderAll(); saveState(); toast('이 결과를 기준 이미지로 지정했어요. 다른 탭에서 이어서 편집하세요.'); };
+$('#dlBtn').onclick = () => { const it = items.get(state.viewId); if (!it) return; const ext = it.dataUrl.startsWith('data:image/png') ? 'png' : 'jpg'; downloadDataUrl(it.dataUrl, `${safe(it.project || v('projectName'))}_${TOOLS[it.tool].title}_${stamp(it.ts)}.${ext}`); };
+$('#copyPromptBtn').onclick = async () => { const it = items.get(state.viewId); if (!it) return; try { await navigator.clipboard.writeText(it.prompt || ''); toast('프롬프트를 복사했어요.'); } catch (e) { toast('복사하지 못했어요.', 'error'); } };
+$('#delBtn').onclick = () => {
+  const id = state.viewId; if (!id) return;
+  items.delete(id); DB.del(id); state.viewId = null; state.mode = 'base'; renderAll(); saveState();
+};
+function rootOf(it) { let cur = it, guard = 0; while (cur && cur.parentId && items.get(cur.parentId) && guard++ < 50) cur = items.get(cur.parentId); return cur; }
+$('#sheetBtn').onclick = async () => {
+  const after = items.get(state.viewId); if (!after) return;
+  const before = rootOf(after);
+  try { await document.fonts.load('600 40px "Pretendard Variable"'); } catch (e) {}
+  const [bi, ai] = await Promise.all([loadImage(before.dataUrl), loadImage(after.dataUrl)]);
+  const W = 2400, pad = 56, gap = 40, colW = (W - pad * 2 - gap) / 2, imgH = Math.round(colW * before.h / before.w);
+  const headH = 110, footH = 86, H = pad + headH + imgH + footH;
+  const c = mk(W, H), x = c.getContext('2d');
+  x.fillStyle = '#f3f3f1'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = '#e6e6e3'; x.lineWidth = 1;
+  for (let gx = 0; gx < W; gx += 48) { x.beginPath(); x.moveTo(gx + .5, 0); x.lineTo(gx + .5, H); x.stroke(); }
+  for (let gy = 0; gy < H; gy += 48) { x.beginPath(); x.moveTo(0, gy + .5); x.lineTo(W, gy + .5); x.stroke(); }
+  const font = '"Pretendard Variable",Pretendard,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+  x.fillStyle = '#1a1a1a'; x.font = `italic 600 54px ${font}`; x.textBaseline = 'alphabetic';
+  x.fillText(settings.labelL || '3D 스케치업 룩', pad, pad + 64);
+  x.fillText(settings.labelR || 'AI 렌더 활용 룩', pad + colW + gap, pad + 64);
+  const top = pad + headH;
+  const drawCover = (img, dx, dy, dw, dh) => { const s = Math.max(dw / img.naturalWidth, dh / img.naturalHeight); const sw = dw / s, sh = dh / s; x.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, dx, dy, dw, dh); };
+  drawCover(bi, pad, top, colW, imgH); drawCover(ai, pad + colW + gap, top, colW, imgH);
+  const cap = after.project || v('projectName');
+  if (cap) { x.font = `500 40px ${font}`; x.textAlign = 'right'; x.fillText(cap, W - pad, top + imgH + 58); }
+  downloadDataUrl(c.toDataURL('image/png'), `${safe(cap)}_before_after_${stamp(after.ts)}.png`);
+};
+
+/* ───────── settings ───────── */
+const dlg = $('#settingsDlg');
+function syncModeFields() { const m = cv('sMode'); $('#directFields').hidden = m !== 'direct'; $('#proxyFields').hidden = m !== 'proxy'; }
+function openSettings() {
+  setChip('sMode', settings.mode); syncModeFields();
+  $('#sKey').value = settings.apiKey; $('#sProxy').value = settings.proxyUrl; $('#sCode').value = settings.accessCode;
+  $('#sModel').value = settings.model; $('#sCustomModel').value = settings.customModel; $('#sCustomModel').hidden = settings.model !== 'custom';
+  $('#sPrompt').value = settings.basePrompt; $('#sLabelL').value = settings.labelL; $('#sLabelR').value = settings.labelR;
+  $('#testMsg').textContent = '';
+  dlg.showModal();
+}
+function readSettingsForm() {
+  return {
+    mode: cv('sMode'), apiKey: $('#sKey').value.trim(), proxyUrl: $('#sProxy').value.trim(), accessCode: $('#sCode').value.trim(),
+    model: $('#sModel').value, customModel: $('#sCustomModel').value.trim(),
+    basePrompt: $('#sPrompt').value.trim() || BASE_PROMPT_DEFAULT, labelL: $('#sLabelL').value.trim() || '3D 스케치업 룩', labelR: $('#sLabelR').value.trim() || 'AI 렌더 활용 룩'
+  };
+}
+$('#sModel').onchange = e => { $('#sCustomModel').hidden = e.target.value !== 'custom'; };
+$('#resetPrompt').onclick = () => { $('#sPrompt').value = BASE_PROMPT_DEFAULT; };
+$('#openSettings').onclick = openSettings;
+$$('[data-close]', dlg).forEach(b => b.onclick = () => dlg.close());
+$('#saveSettings').onclick = () => { Object.assign(settings, readSettingsForm()); store.set('slr.settings', settings); dlg.close(); syncConn(); updatePreview(); toast('설정을 저장했어요.'); };
+$('#testBtn').onclick = async () => {
+  const prev = Object.assign({}, settings); Object.assign(settings, readSettingsForm());
+  const msg = $('#testMsg'); msg.style.color = 'var(--muted)'; msg.textContent = '확인 중…';
+  try {
+    const { url, headers } = endpoint(`/v1beta/models/${encodeURIComponent(modelId())}`);
+    delete headers['Content-Type'];
+    const res = await fetch(url, { headers }); const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((j && j.error && j.error.message) || `HTTP ${res.status}`);
+    msg.style.color = 'var(--ok)'; msg.textContent = `연결됨 · ${(j && (j.displayName || j.name)) || modelId()}`;
+  } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = e.message.slice(0, 120); }
+  finally { Object.assign(settings, prev); }
+};
+function syncConn() {
+  const ok = configured();
+  $('#connDot').classList.toggle('ok', ok);
+  $('#connText').textContent = ok ? (settings.mode === 'proxy' ? '사내 프록시' : 'Gemini API') + ' · ' + (modelId() || '').replace(/^gemini-/, '') : 'API 미설정';
+  $('#setupCallout').hidden = ok;
+}
+
+/* ───────── keys ───────── */
+document.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea,select,dialog')) return;
+  if (!TOOLS[state.tool].mask) return;
+  const r = $('#brushSize');
+  if (e.key === 'b' || e.key === 'B') setBrush('paint');
+  else if (e.key === 'e' || e.key === 'E') setBrush('erase');
+  else if (e.key === '[') r.value = Math.max(8, +r.value - 8);
+  else if (e.key === ']') r.value = Math.min(160, +r.value + 8);
+});
+
+/* ───────── init ───────── */
+(async function init() {
+  $('#projectName').value = store.get('slr.project', '');
+  syncConn(); renderRefs(); setTool('render'); setCmp(50);
+  if (await DB.open()) {
+    const all = await DB.all();
+    all.sort((a, b) => a.ts - b.ts).forEach(it => items.set(it.id, it));
+    const s = store.get('slr.state', {});
+    const lastUpload = [...items.values()].filter(i => i.kind === 'upload').sort((a, b) => b.ts - a.ts)[0];
+    const baseId = items.has(s.baseId) ? s.baseId : (lastUpload && lastUpload.id);
+    if (baseId) { setBase(baseId); if (items.has(s.viewId)) { state.viewId = s.viewId; state.mode = s.mode === 'base' ? 'base' : (s.mode || 'compare'); } }
+  }
+  renderAll();
+})();
+})();
+</script>
+</body>
+</html>
