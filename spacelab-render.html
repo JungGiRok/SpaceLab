@@ -146,6 +146,12 @@ details.pp pre{white-space:pre-wrap;word-break:break-word;font:11.5px/1.5 ui-mon
 .res-actions button:hover{border-color:var(--line2)}
 .res-actions button.main{grid-column:1/-1;background:var(--accentSoft);border-color:rgba(227,162,74,.45);color:var(--accent2);font-weight:700}
 .res-actions button.del{color:#ff9c8f}
+.qa{font-size:12px;line-height:1.55;border-radius:8px;padding:8px 10px;margin-bottom:8px;background:var(--surface3);border:1px solid var(--line);color:var(--muted)}
+.qa.ok{background:rgba(95,207,143,.08);border-color:rgba(95,207,143,.35);color:#8fe0b0}
+.qa.warn{background:rgba(255,106,87,.09);border-color:rgba(255,106,87,.4);color:#ffb3a8}
+.qa ul{margin:6px 0 8px 16px;padding:0} .qa li{margin:2px 0} .qa li b{color:var(--text)}
+.qa button{width:100%;background:rgba(255,106,87,.16);border:1px solid rgba(255,106,87,.45);color:#ffc4bb;border-radius:7px;padding:7px;font-size:12px;font-weight:700}
+.spec-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 
 /* ── dialog ── */
 dialog{border:1px solid var(--line2);border-radius:14px;background:var(--surface);color:var(--text);padding:0;width:min(560px,94vw);max-height:90vh}
@@ -288,8 +294,20 @@ dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
         <div class="field">
           <div class="lbl">인물</div>
           <div class="chips" data-name="rPeople">
-            <button data-v="none">없음</button><button data-v="few" class="on">약간 (2–4명)</button><button data-v="some">보통 (5–10명)</button>
+            <button data-v="none" class="on">없음</button><button data-v="few">약간 (2–4명)</button><button data-v="some">보통 (5–10명)</button>
           </div>
+        </div>
+        <div class="field">
+          <div class="lbl">진열 제품</div>
+          <div class="chips" data-name="rStock">
+            <button data-v="keep" class="on">도면 그대로</button><button data-v="bakery">베이커리 제품 채우기</button><button data-v="empty">비워두기</button>
+          </div>
+          <input class="inp" id="rStockDesc" placeholder="선택) 예: 크루아상, 바게트, 조각 케이크, 샌드위치" style="margin-top:6px" hidden>
+          <div class="note">특정 제품 사진을 진열하려면 렌더 후 왼쪽 <b>제품 진열</b> 도구를 쓰세요.</div>
+        </div>
+        <div class="field">
+          <div class="lbl spec-head"><span>마감재 체크리스트 <em>AI가 이 목록대로 렌더</em></span><button class="tiny-btn" id="specBtn" type="button">도면에서 자동 정리</button></div>
+          <textarea class="inp" id="rSpec" rows="6" placeholder="‘도면에서 자동 정리’를 누르거나, 렌더 생성 시 자동으로 채워집니다. 틀린 부분은 직접 고쳐주세요.&#10;예) - 테이블: 흰색 대리석 상판, 검정 다리"></textarea>
         </div>
         <div class="field">
           <div class="lbl">마감재·디테일 메모 <em>선택</em></div>
@@ -489,11 +507,11 @@ dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
       <button class="btn-primary" id="genBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg><span id="genLabel">렌더 생성</span></button>
       <div class="res-card" id="resCard" hidden>
         <div class="t" id="resInfo"></div>
+        <div id="qaBox"></div>
         <div class="res-actions">
           <button class="main" id="useAsBase">이 결과로 이어서 편집 →</button>
           <button id="dlBtn">다운로드</button>
           <button id="sheetBtn">비교 시트 저장</button>
-          <button id="copyPromptBtn">사용 프롬프트 복사</button>
           <button class="del" id="delBtn">삭제</button>
         </div>
       </div>
@@ -596,7 +614,7 @@ const TOOLS = {
 
 const MAP = {
   space: {
-    mall: 'store unit inside a shopping mall (the mall corridor is visible outside the open storefront)',
+    mall: 'store unit inside a shopping mall (show mall surroundings only where they are already drawn in the image)',
     street: 'street-front store',
     foodcourt: 'food court unit with shared seating',
     office: 'store in an office building lobby',
@@ -606,6 +624,11 @@ const MAP = {
     mall: 'bright, even shopping-mall ambient lighting combined with the store\'s own warm accent lighting',
     day: 'natural daylight entering through the glazing, balanced with interior lighting',
     warm: 'warm evening atmosphere, interior lights glowing (about 3000K)'
+  },
+  rStock: {
+    keep: 'Display shelves, cases, baskets and counters: keep exactly the objects drawn on them (same shapes, colors, sizes and positions) and render them as realistic versions of what is drawn. Do not replace them with other products and do not add products anywhere.',
+    bakery: 'Fill ONLY the existing display shelves, cases, trays and baskets with realistic, appetizing {brand}bakery products{items}, neatly merchandised at true scale. Products stay inside the existing fixtures; do not change, move or add any fixture, counter, signage or anything else.',
+    empty: 'Leave all display shelves, cases and baskets empty and clean. Do not add any products.'
   },
   rPeople: {
     none: 'Do not add any people.',
@@ -728,12 +751,15 @@ function endpoint(path) {
   }
   return { url, headers };
 }
-async function callGemini(parts, imageSize) {
+async function callGemini(parts, imageSize, aspectRatio) {
   const model = modelId();
   if (!model) throw new Error('설정에서 모델을 선택해 주세요.');
   const { url, headers } = endpoint(`/v1beta/models/${encodeURIComponent(model)}:generateContent`);
   const generationConfig = { responseModalities: ['TEXT', 'IMAGE'] };
-  if (imageSize && supportsImageSize(model)) generationConfig.imageConfig = { imageSize };
+  const imageConfig = {};
+  if (imageSize && supportsImageSize(model)) imageConfig.imageSize = imageSize;
+  if (aspectRatio) imageConfig.aspectRatio = aspectRatio;
+  if (Object.keys(imageConfig).length) generationConfig.imageConfig = imageConfig;
   const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig }) });
   let json = null; try { json = await res.json(); } catch (e) {}
   if (!res.ok) throw new Error((json && json.error && json.error.message) || `요청 실패 (HTTP ${res.status})`);
@@ -762,11 +788,17 @@ function buildPrompt(tool, ctx) {
     const loc = v('rLocation'); if (loc) L.push(`- Location: ${loc} (reflect it in the exterior view and in any people)`);
     L.push(`- Lighting: ${MAP.light[cv('rLight')]}`);
     const det = v('rDetails'); if (det) L.push(`- Materials & notes: ${det}`);
+    const spec = v('rSpec');
+    if (spec) L.push('', 'Material & color schedule taken from the drawing — every element must look exactly like this in the photo (same material, color, finish and pattern; do not substitute):', spec);
     L.push('', 'Rendering requirements:',
       '- The input is a SketchUp viewport export. Convert flat colors, outlines and placeholder textures into physically accurate real materials with soft global illumination, realistic reflections and contact shadows, while every object stays exactly where it is.',
+      '- This is a strict photoreal conversion of the SAME image, not a redesign. Keep the exact camera position, framing and crop. Do not zoom out, extend the scene, or reveal anything beyond the edges of the drawing.',
+      '- Keep every element exactly as drawn: ceiling type, height and fixtures (never turn a finished ceiling into an exposed ceiling or the reverse), wall, floor and counter finishes and colors, furniture models, colors and counts, planters, partitions and glazing.',
+      '- Do not add, remove, replace or restyle any architecture, furniture, fixtures or decor. Plain or white areas stay plain surfaces of the same color; never invent shops, corridors, ceilings or rooms there.',
       '- Keep all signage, logos, lettering and menu text exactly as shown and legible.',
       '- Keep the same lens, field of view and two-point perspective (vertical lines stay vertical).',
-      '- ' + MAP.rPeople[cv('rPeople')]);
+      '- ' + MAP.rPeople[cv('rPeople')],
+      '- ' + MAP.rStock[cv('rStock')].replace('{brand}', v('rBrand') ? v('rBrand') + ' ' : '').replace('{items}', v('rStockDesc') ? ` (${v('rStockDesc')})` : ''));
     if (chk('rFillScreens')) L.push(`- Blank or black digital screens and menu boards: fill them with ${v('rScreenContent') || 'on-brand food advertising graphics'}, in the brand's graphic style.`);
     if (ctx.styleRef) L.push('- Use the mood reference image only for lighting, color grading and photographic atmosphere. Never copy its layout, geometry, furniture or materials.');
     L.push('- Output one photorealistic, high-resolution architectural interior photograph.');
@@ -813,6 +845,10 @@ function buildPrompt(tool, ctx) {
       'Do not add, remove or move anything. ' + MAP.upLevel[cv('uLevel')]);
     if (chk('uFix')) L.push('Repair any distorted faces, hands or bodies of people so they look natural, without changing their position, pose or clothing.');
     if (chk('uText')) L.push('Make signage, logos and lettering sharp and clean, keeping the exact same text.');
+  }
+  if (state.fixNotes && state.fixNotes.length) {
+    L.push('', 'IMPORTANT — a previous attempt wrongly changed the following. This time keep each of them exactly as in the base drawing:');
+    state.fixNotes.forEach(i => L.push(`- ${i.element}: ${i.change}`));
   }
   return L.join('\n');
 }
@@ -903,6 +939,68 @@ async function compositeWithMask(base, resultUrl, maskSnap) {
   return out.toDataURL('image/jpeg', 0.95);
 }
 
+/* ───────── framing: keep the exact composition ─────────
+   1) 흰 여백 자동 제거  2) Gemini 지원 비율로 회색 패딩  3) 결과에서 패딩 제거 후 원래 프레임에 복원 */
+const RATIOS = [['1:1', 1], ['5:4', 5 / 4], ['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9], ['21:9', 21 / 9],
+                ['4:5', 4 / 5], ['3:4', 3 / 4], ['2:3', 2 / 3], ['9:16', 9 / 16]];
+const PAD_COLOR = '#808080';
+async function prepFrame(base) {
+  const img = await loadImage(base.dataUrl);
+  const W = img.naturalWidth, H = img.naturalHeight;
+  // -- find plain white margins on a small copy
+  const sc = Math.min(1, 640 / Math.max(W, H));
+  const sw = Math.max(1, Math.round(W * sc)), sh = Math.max(1, Math.round(H * sc));
+  const sm = mk(sw, sh), sx = sm.getContext('2d'); sx.drawImage(img, 0, 0, sw, sh);
+  const d = sx.getImageData(0, 0, sw, sh).data;
+  const isWhite = i => d[i] >= 244 && d[i + 1] >= 244 && d[i + 2] >= 244;
+  const tol = 0.004;
+  const rowWhite = y => { let n = 0; for (let x = 0; x < sw; x++) if (!isWhite((y * sw + x) * 4) && ++n > sw * tol) return false; return true; };
+  let top = 0, bot = sh - 1;
+  while (top < bot && rowWhite(top)) top++;
+  while (bot > top && rowWhite(bot)) bot--;
+  const colWhite = x => { let n = 0; for (let y = top; y <= bot; y++) if (!isWhite((y * sw + x) * 4) && ++n > (bot - top + 1) * tol) return false; return true; };
+  let left = 0, right = sw - 1;
+  while (left < right && colWhite(left)) left++;
+  while (right > left && colWhite(right)) right--;
+  let tx = Math.max(0, Math.floor(left / sc)), ty = Math.max(0, Math.floor(top / sc));
+  let tw = Math.min(W, Math.ceil((right + 1) / sc)) - tx, th = Math.min(H, Math.ceil((bot + 1) / sc)) - ty;
+  const meaningful = (tw < W * 0.98 || th < H * 0.98) && tw * th > W * H * 0.25;
+  if (!meaningful) { tx = 0; ty = 0; tw = W; th = H; }
+  // -- closest supported ratio, then pad (never crop)
+  const ar = tw / th;
+  let best = RATIOS[0];
+  for (const r of RATIOS) if (Math.abs(Math.log(ar / r[1])) < Math.abs(Math.log(ar / best[1]))) best = r;
+  let PW, PH;
+  if (ar > best[1]) { PW = tw; PH = Math.round(tw / best[1]); } else { PH = th; PW = Math.round(th * best[1]); }
+  const px = Math.round((PW - tw) / 2), py = Math.round((PH - th) / 2);
+  const c = mk(PW, PH), x = c.getContext('2d');
+  x.fillStyle = PAD_COLOR; x.fillRect(0, 0, PW, PH);
+  x.drawImage(img, tx, ty, tw, th, px, py, tw, th);
+  return { sendUrl: c.toDataURL('image/jpeg', 0.92), ratio: best[0], W, H, tx, ty, tw, th, PW, PH, px, py,
+           trimmed: tw < W || th < H, padded: PW > tw || PH > th };
+}
+async function frameOther(url, f) {   // apply the same trim + pad to a same-view image (region guide)
+  const img = await loadImage(url);
+  const k = img.naturalWidth / f.W;
+  const c = mk(f.PW, f.PH), x = c.getContext('2d');
+  x.fillStyle = PAD_COLOR; x.fillRect(0, 0, f.PW, f.PH);
+  x.drawImage(img, f.tx * k, f.ty * k, f.tw * k, f.th * k, f.px, f.py, f.tw, f.th);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+async function restoreFrame(url, base, f) {
+  if (!f.trimmed && !f.padded) return url;
+  const r = await loadImage(url);
+  const kx = r.naturalWidth / f.PW, ky = r.naturalHeight / f.PH;
+  const cx = f.px * kx, cy = f.py * ky, cw = f.tw * kx, ch = f.th * ky;
+  const k = cw / f.tw;                                   // keep the generated resolution
+  const OW = Math.round(f.W * k), OH = Math.round(f.H * k);
+  const out = mk(OW, OH), o = out.getContext('2d');
+  if (f.trimmed) { const bi = await loadImage(base.dataUrl); o.drawImage(bi, 0, 0, OW, OH); }
+  o.imageSmoothingQuality = 'high';
+  o.drawImage(r, cx, cy, cw, ch, f.tx * k, f.ty * k, f.tw * k, f.th * k);
+  return out.toDataURL('image/jpeg', 0.95);
+}
+
 /* ───────── stage / viewer ───────── */
 const viewer = $('#viewer');
 function displayItem() {
@@ -981,6 +1079,7 @@ function selectItem(id) {
 function setBase(id) {
   if (state.baseId !== id) { state.baseId = id; const b = items.get(id); maskCanvas.width = b.w; maskCanvas.height = b.h; state.hasMask = false; }
   state.viewId = null; state.mode = 'base';
+  syncSpecField();
 }
 function renderAll() { renderStage(); renderFilm(); updatePreview(); }
 
@@ -989,6 +1088,7 @@ function renderResCard() {
   $('#resCard').hidden = !view;
   if (!view) return;
   $('#resInfo').innerHTML = `선택한 결과 · <b>${TOOLS[view.tool].title}</b> · ${fmtTime(view.ts)} · ${view.w}×${view.h}`;
+  renderQa(view);
 }
 function addItem(it) {
   items.set(it.id, it); DB.put(it);
@@ -1065,6 +1165,80 @@ $('#editPresets').addEventListener('click', e => {
 $('.panel-body').addEventListener('input', updatePreview);
 $('#projectName').addEventListener('input', e => { store.set('slr.project', e.target.value); updatePreview(); });
 $('#rFillScreens').addEventListener('change', e => { $('#screenField').hidden = !e.target.checked; });
+$('.chips[data-name="rStock"]').addEventListener('click', () => setTimeout(() => { $('#rStockDesc').hidden = cv('rStock') !== 'bakery'; updatePreview(); }));
+
+/* ───────── 마감재 체크리스트 · 렌더 검수 ───────── */
+const CHECK_MODEL = 'gemini-2.5-flash';
+const SPEC_PROMPT = `너는 인테리어 디자인 검수 담당자야. 이 SketchUp 투시도에 '그려진 그대로'의 마감재와 색을 요소별로 정리해 줘.
+반드시 포함: 천장(형태·색·조명기구), 벽(구역별), 바닥, 카운터·쇼케이스·진열장, 테이블(상판·다리), 의자·스툴·벤치, 사인·로고 문구, 디스플레이 화면, 식물·소품, 선반 위 제품 또는 제품 자리 표시물.
+규칙: 보이는 그대로만 적고 다른 재료를 추측하지 말 것(예: 흰 면은 '흰색', 대리석 무늬면 '흰색 대리석 무늬'). 한 줄에 하나씩 '- 요소: 설명' 형식, 최대 20줄, 다른 말은 쓰지 말 것.`;
+async function callText(parts, asJson) {
+  const { url, headers } = endpoint(`/v1beta/models/${CHECK_MODEL}:generateContent`);
+  const body = { contents: [{ role: 'user', parts }] };
+  if (asJson) body.generationConfig = { responseMimeType: 'application/json' };
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  let j = null; try { j = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error((j && j.error && j.error.message) || `분석 요청 실패 (HTTP ${res.status})`);
+  const ps = (j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  return ps.filter(p => p.text && !p.thought).map(p => p.text).join('').trim();
+}
+async function smallPart(dataUrl, edge = 1024) { const img = await loadImage(dataUrl); return dataUrlToPart(drawScaled(img, edge).toDataURL('image/jpeg', 0.85)); }
+async function analyzeSpec(base) {
+  const t = await callText([await smallPart(base.dataUrl), { text: SPEC_PROMPT }]);
+  return t.split('\n').map(l => l.trim()).filter(l => l.startsWith('-')).join('\n') || t;
+}
+function syncSpecField() { const b = items.get(state.baseId); $('#rSpec').value = (b && b.spec) || ''; }
+$('#specBtn').onclick = async () => {
+  const base = items.get(state.baseId);
+  if (!base) return toast('먼저 SketchUp 투시도를 올려 주세요.', 'error');
+  if (!configured()) { openSettings(); return toast('API 연결 정보를 먼저 입력해 주세요.', 'error'); }
+  const btn = $('#specBtn'); btn.disabled = true; btn.textContent = '정리 중…';
+  try { base.spec = await analyzeSpec(base); DB.put(base); syncSpecField(); updatePreview(); toast('도면 마감재를 정리했어요. 틀린 부분은 직접 고쳐주세요.'); }
+  catch (e) { toast(e.message || String(e), 'error'); }
+  finally { btn.disabled = false; btn.textContent = '도면에서 자동 정리'; }
+};
+$('#rSpec').addEventListener('input', () => { const b = items.get(state.baseId); if (b) { b.spec = $('#rSpec').value; DB.put(b); } updatePreview(); });
+function allowedChanges(tool) {
+  if (tool === 'atmos') return ['조명·시간대·날씨·계절·창밖 풍경·색온도 변화'];
+  if (tool === 'upscale') return ['해상도·선명도 향상', '인물 얼굴·손 보정'];
+  const a = ['SketchUp 표현을 실사로 바꾼 것(질감·조명·그림자·반사)', '선택한 조명 분위기'];
+  if (cv('rPeople') !== 'none') a.push('사람 추가');
+  if (cv('rStock') === 'bakery') a.push('기존 진열대·쇼케이스 안에 베이커리 제품을 채운 것');
+  if (chk('rFillScreens')) a.push('비어 있던 디지털 화면·메뉴보드에 그래픽을 채운 것');
+  return a;
+}
+async function verifyResult(it, base, tool) {
+  it.qa = { state: 'checking' }; if (state.viewId === it.id) renderResCard();
+  const prompt = `이미지 A는 원본 디자인 투시도(SketchUp), 이미지 B는 그걸 실사로 바꾼 AI 렌더야. 디자인 검수자로서 B가 A의 디자인을 바꾼 부분을 찾아줘.
+허용되는 차이(보고하지 말 것): ${allowedChanges(tool).join(', ')}.
+반드시 보고할 것: 요소의 재질·마감·색·패턴 변경(예: 흰 대리석 테이블 → 원목), 가구·집기·조명기구 모양이나 개수 변경, 건축 요소(천장 형태·벽·기둥·카운터) 변경·추가·삭제, 사인·로고 문구 변경, 카메라 구도·화면 범위 변경, 도면에 없는 물건 추가.
+JSON으로만 답해: {"issues":[{"element":"요소","change":"A에서 어떻게 → B에서 어떻게"}]}. 바뀐 게 없으면 {"issues":[]}.`;
+  try {
+    const t = await callText([{ text: '이미지 A (원본 투시도):' }, await smallPart(base.dataUrl), { text: '이미지 B (AI 렌더):' }, await smallPart(it.dataUrl), { text: prompt }], true);
+    let d; try { d = JSON.parse(t); } catch (e) { const m = t.match(/\{[\s\S]*\}/); d = m ? JSON.parse(m[0]) : { issues: [] }; }
+    const issues = (Array.isArray(d.issues) ? d.issues : []).filter(i => i && (i.element || i.change)).slice(0, 8)
+      .map(i => ({ element: String(i.element || '').slice(0, 60), change: String(i.change || '').slice(0, 160) }));
+    it.qa = { state: issues.length ? 'warn' : 'ok', issues };
+  } catch (e) { it.qa = { state: 'error', msg: (e.message || String(e)).slice(0, 80) }; }
+  DB.put(it);
+  if (state.viewId === it.id) renderResCard();
+  if (it.qa.state === 'warn') toast(`원본과 다른 부분 ${it.qa.issues.length}건이 감지됐어요. 오른쪽 아래에서 확인하세요.`, 'error');
+}
+const escH = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function renderQa(view) {
+  const q = view.qa, box = $('#qaBox');
+  if (!q) { box.innerHTML = ''; return; }
+  if (q.state === 'checking') box.innerHTML = '<div class="qa">🔍 원본 투시도와 비교 검수 중…</div>';
+  else if (q.state === 'ok') box.innerHTML = '<div class="qa ok">✓ 검수 통과 · 형태·마감재·구도 변경이 감지되지 않았어요</div>';
+  else if (q.state === 'error') box.innerHTML = `<div class="qa">검수를 하지 못했어요 (${escH(q.msg)}) · 결과를 직접 확인해 주세요</div>`;
+  else {
+    box.innerHTML = `<div class="qa warn"><b>⚠ 원본과 다른 부분 ${q.issues.length}건</b><ul>${q.issues.map(i => `<li><b>${escH(i.element)}</b> · ${escH(i.change)}</li>`).join('')}</ul><button id="fixBtn" type="button">이 부분을 원본대로 고쳐서 다시 생성</button></div>`;
+    $('#fixBtn').onclick = () => {
+      if (view.parentId && items.has(view.parentId) && state.baseId !== view.parentId) setBase(view.parentId);
+      setTool(view.tool); state.fixNotes = q.issues; generate();
+    };
+  }
+}
 
 /* ───────── generate ───────── */
 async function generate() {
@@ -1078,16 +1252,23 @@ async function generate() {
   if (tool === 'products' && !productRefs.length && !v('kDesc')) return toast('제품 사진을 올리거나 제품 설명을 적어 주세요.', 'error');
   if (tool === 'products' && !state.hasMask) toast('매대 영역을 칠하지 않아 이미지 전체를 보고 배치합니다.');
 
+  if (tool === 'render' && !v('rSpec')) {
+    toast('도면 마감재를 먼저 정리하고 있어요…');
+    try { base.spec = await analyzeSpec(base); DB.put(base); syncSpecField(); }
+    catch (e) { toast('마감재 자동 정리에 실패해 체크리스트 없이 진행해요.', 'error'); }
+  }
   const prompt = buildPrompt(tool, ctx);
-  const parts = [{ text: 'Base image (the photo / model view to work on):' }, dataUrlToPart(base.dataUrl)];
+  state.fixNotes = null;
+  const frame = await prepFrame(base);
+  const parts = [{ text: 'Base image (the photo / model view to work on):' }, dataUrlToPart(frame.sendUrl)];
   let maskSnap = null;
   if (ctx.hasMask) {
     maskSnap = cloneCanvas(maskCanvas);
-    parts.push({ text: 'Region-guide image (same view; the red-tinted area marks the region to work in):' }, dataUrlToPart(await makeGuide(base, maskSnap)));
+    parts.push({ text: 'Region-guide image (same view; the red-tinted area marks the region to work in):' }, dataUrlToPart(await frameOther(await makeGuide(base, maskSnap), frame)));
   }
   if (ctx.styleRef) parts.push({ text: 'Mood reference image (lighting / color grading only):' }, dataUrlToPart(styleRef.dataUrl));
   if (tool === 'products') productRefs.forEach((p, i) => parts.push({ text: `Product reference ${i + 1}${p.name ? ` (${p.name})` : ''}:` }, dataUrlToPart(p.dataUrl)));
-  parts.push({ text: prompt });
+  parts.push({ text: prompt + (frame.padded ? '\n\nNote: the base image has flat neutral-gray padding bars along some edges. They are NOT part of the scene. Do not extend the room into them; leave them flat gray. Keep the scene inside them exactly where it is.' : '') });
 
   const composite = ctx.hasMask && chk('keepOutside');
   const size = tool === 'upscale' ? cv('uSize') : $('#optSize').value;
@@ -1098,13 +1279,14 @@ async function generate() {
     const pend = { id: uid(), tool, start: Date.now() };
     state.pending.push(pend); renderFilm();
     try {
-      const img = await callGemini(parts, size);
-      let url = `data:${img.mime};base64,${img.data}`;
+      const img = await callGemini(parts, size, frame.ratio);
+      let url = await restoreFrame(`data:${img.mime};base64,${img.data}`, base, frame);
       if (composite) url = await compositeWithMask(base, url, maskSnap);
       const im = await loadImage(url);
       const it = { id: uid(), kind: 'result', dataUrl: url, w: im.naturalWidth, h: im.naturalHeight, tool, parentId: base.id, ts: Date.now(), prompt, project: v('projectName') };
       it.thumb = await makeThumb(url);
       addItem(it);
+      if (tool === 'render' || tool === 'atmos' || tool === 'upscale') verifyResult(it, base, tool);
       if (!shown) { shown = true; state.viewId = it.id; state.mode = 'compare'; setCmp(50); }
     } catch (e) {
       toast(e.message || String(e), 'error');
@@ -1126,7 +1308,7 @@ const safe = s => (s || 'render').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, 
 const stamp = ts => { const d = new Date(ts); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; };
 $('#useAsBase').onclick = () => { const id = state.viewId; if (!id) return; setBase(id); renderAll(); saveState(); toast('이 결과를 기준 이미지로 지정했어요. 다른 탭에서 이어서 편집하세요.'); };
 $('#dlBtn').onclick = () => { const it = items.get(state.viewId); if (!it) return; const ext = it.dataUrl.startsWith('data:image/png') ? 'png' : 'jpg'; downloadDataUrl(it.dataUrl, `${safe(it.project || v('projectName'))}_${TOOLS[it.tool].title}_${stamp(it.ts)}.${ext}`); };
-$('#copyPromptBtn').onclick = async () => { const it = items.get(state.viewId); if (!it) return; try { await navigator.clipboard.writeText(it.prompt || ''); toast('프롬프트를 복사했어요.'); } catch (e) { toast('복사하지 못했어요.', 'error'); } };
+
 $('#delBtn').onclick = () => {
   const id = state.viewId; if (!id) return;
   items.delete(id); DB.del(id); state.viewId = null; state.mode = 'base'; renderAll(); saveState();
