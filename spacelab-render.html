@@ -260,7 +260,7 @@ dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
     </div>
 
     <div class="panel-body">
-      <div class="callout warn" id="setupCallout" hidden>먼저 오른쪽 위 <b>설정</b>에서 Gemini API 키(또는 사내 프록시)를 입력해 주세요.</div>
+      <div class="callout warn" id="setupCallout" hidden>먼저 오른쪽 위 <b>설정</b>에서 <b>사내 접속 코드</b>를 입력해 주세요. (SpaceLab 도구함에서 입장했다면 자동으로 채워집니다)</div>
 
       <!-- RENDER -->
       <section class="tool-panel" data-tool="render">
@@ -507,7 +507,7 @@ dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
     <div class="field">
       <div class="lbl">연결 방식</div>
       <div class="chips" data-name="sMode" id="sModeChips">
-        <button data-v="direct" class="on">Gemini API 키 직접</button><button data-v="proxy">사내 프록시 (Cloudflare Worker 등)</button>
+        <button data-v="proxy" class="on">SpaceLab 사내 연결 (권장)</button><button data-v="direct">개인 Gemini API 키</button>
       </div>
     </div>
     <div id="directFields">
@@ -519,7 +519,7 @@ dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
     <div id="proxyFields" hidden>
       <div class="field">
         <div class="lbl">프록시 URL</div>
-        <input class="inp" id="sProxy" placeholder="https://render-proxy.xxx.workers.dev">
+        <input class="inp" id="sProxy" placeholder="https://morning-lake-5cb9space-lab-proxy.oh-roro-land.workers.dev">
         <div class="note">요청은 <code>{프록시}/v1beta/models/{모델}:generateContent</code>로 전달되고, 접속 코드는 <code>X-Access-Code</code> 헤더로 보냅니다.</div>
       </div>
       <div class="field">
@@ -572,11 +572,18 @@ const store = {
 
 /* ───────── config ───────── */
 const BASE_PROMPT_DEFAULT = 'Generate this SketchUp reference image into a realistic photo, similar to a DSLR camera photo with ultra HD resolution, without changing the layout, geometry, or material textures in the reference image, while reflecting the specific project details. The form, design, materials/finishes, composition, and all other elements must remain exactly as they are. No modifications are allowed.';
+/* SpaceLab 공용 설정: 관리인(Cloudflare) 주소와 도구함 공용 접속 코드 */
+const SPACELAB_PROXY = 'https://morning-lake-5cb9space-lab-proxy.oh-roro-land.workers.dev';
+const SHARED_CODE_KEY = 'space_tools_access_code';
+const sharedCode = () => { try { return localStorage.getItem(SHARED_CODE_KEY) || ''; } catch (e) { return ''; } };
 const settings = Object.assign({
-  mode: 'direct', apiKey: '', proxyUrl: '', accessCode: '',
+  mode: 'proxy', apiKey: '', proxyUrl: SPACELAB_PROXY, accessCode: '',
   model: 'gemini-3-pro-image-preview', customModel: '',
   basePrompt: BASE_PROMPT_DEFAULT, labelL: '3D 스케치업 룩', labelR: 'AI 렌더 활용 룩'
 }, store.get('slr.settings', {}));
+if (!settings.proxyUrl) settings.proxyUrl = SPACELAB_PROXY;
+if (!settings.accessCode) settings.accessCode = sharedCode();
+if (settings.mode === 'direct' && !settings.apiKey) settings.mode = 'proxy';   // 개인 키가 없으면 사내 연결로
 
 const TOOLS = {
   render:   { title: '실사 렌더',   desc: '레이아웃·형태·마감재는 그대로, DSLR 사진 같은 실사 투시도로 변환합니다.', mask: false, gen: '렌더 생성' },
@@ -1171,7 +1178,8 @@ $('#sModel').onchange = e => { $('#sCustomModel').hidden = e.target.value !== 'c
 $('#resetPrompt').onclick = () => { $('#sPrompt').value = BASE_PROMPT_DEFAULT; };
 $('#openSettings').onclick = openSettings;
 $$('[data-close]', dlg).forEach(b => b.onclick = () => dlg.close());
-$('#saveSettings').onclick = () => { Object.assign(settings, readSettingsForm()); store.set('slr.settings', settings); dlg.close(); syncConn(); updatePreview(); toast('설정을 저장했어요.'); };
+$('#saveSettings').onclick = () => { Object.assign(settings, readSettingsForm()); store.set('slr.settings', settings);
+  if (settings.mode === 'proxy' && settings.accessCode) { try { localStorage.setItem(SHARED_CODE_KEY, settings.accessCode); } catch (e) {} } dlg.close(); syncConn(); updatePreview(); toast('설정을 저장했어요.'); };
 $('#testBtn').onclick = async () => {
   const prev = Object.assign({}, settings); Object.assign(settings, readSettingsForm());
   const msg = $('#testMsg'); msg.style.color = 'var(--muted)'; msg.textContent = '확인 중…';
@@ -1218,5 +1226,8 @@ document.addEventListener('keydown', e => {
 })();
 })();
 </script>
+<!-- 허브로 돌아가기 -->
+<a href="./" class="hub-back" style="position:fixed;left:16px;bottom:16px;z-index:1000;background:#16245c;color:#fff;text-decoration:none;font:600 12px/1 'Pretendard','Noto Sans KR',sans-serif;padding:10px 14px;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.35)">← 도구함</a>
+<style>@media print{.hub-back{display:none!important}}</style>
 </body>
 </html>
